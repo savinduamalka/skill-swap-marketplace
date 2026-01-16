@@ -1,0 +1,476 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== AUTH MODELS (NextAuth) ====================
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  type                  String
+  provider              String
+  providerAccountId     String
+  refresh_token         String?   @db.Text
+  access_token          String?   @db.Text
+  expires_at            Int?
+  token_type            String?
+  scope                 String?
+  id_token              String?   @db.Text
+  session_state         String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+// ==================== USER MODELS ====================
+
+model User {
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  emailVerified         DateTime?
+  fullName              String?
+  name                  String?
+  image                 String?
+  passwordHash          String?
+  avatarUrl             String?
+  bio                   String?
+  timeZone              String    @default("UTC")
+  isAdmin               Boolean   @default(false)
+  isVerified            Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Auth Relations
+  accounts              Account[]
+
+  // Relations
+  skillsOffered         Skill[]                    @relation("SkillOwner")
+  skillsWanted          SkillWant[]
+  wallet                Wallet?
+  sentConnectionRequests ConnectionRequest[]       @relation("SentBy")
+  receivedConnectionRequests ConnectionRequest[]   @relation("ReceivedBy")
+  connections           Connection[]              @relation("User1Connections")
+  connectedTo           Connection[]              @relation("User2Connections")
+  sentMessages          Message[]                 @relation("SentBy")
+  receivedMessages      Message[]                 @relation("ReceivedBy")
+  sessionsAsLearner     Session[]                 @relation("Learner")
+  sessionsAsProvider    Session[]                 @relation("Provider")
+  sentSessionRequests   SessionRequest[]          @relation("SentBy")
+  receivedSessionRequests SessionRequest[]        @relation("ReceivedBy")
+  reviewsGiven          Review[]                  @relation("ReviewedBy")
+  reviewsReceived       Review[]                  @relation("ReviewedUser")
+  newsfeedPosts         NewsfeedPost[]            @relation("Author")
+  postLikes             PostLike[]
+  postComments          PostComment[]             @relation("Commenter")
+  notifications         Notification[]
+
+  @@index([email])
+  @@map("users")
+}
+
+// ==================== SKILL MODELS ====================
+
+model Skill {
+  id                    String    @id @default(cuid())
+  ownerId               String
+  name                  String
+  description           String
+  proficiencyLevel      String    // "Beginner" | "Intermediate" | "Advanced" | "Expert"
+  yearsOfExperience     Int
+  teachingFormat        String    // "Online" | "In-Person" | "Hybrid"
+  availabilityWindow    String    // "06:00-10:00" format
+  timeZone              String
+  isMandatory           Boolean   @default(true) // At least one skill is mandatory
+  isTeaching            Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  owner                 User      @relation("SkillOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  sessions              Session[]
+  reviews               Review[]  @relation("ReviewedSkill")
+
+  @@index([ownerId])
+  @@index([name])
+  @@map("skills")
+}
+
+model SkillWant {
+  id                    String    @id @default(cuid())
+  userId                String
+  name                  String
+  description           String?
+  proficiencyTarget     String?   // "Beginner" | "Intermediate" | "Advanced" | "Expert"
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([name])
+  @@map("skill_wants")
+}
+
+// ==================== CONNECTION MODELS ====================
+
+model ConnectionRequest {
+  id                    String    @id @default(cuid())
+  senderId              String
+  receiverId            String
+  status                String    @default("PENDING") // "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED"
+  creditsHeld           Int       @default(5) // Credits held in outgoing wallet
+  createdAt             DateTime  @default(now())
+  respondedAt           DateTime?
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  sender                User      @relation("SentBy", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver              User      @relation("ReceivedBy", fields: [receiverId], references: [id], onDelete: Cascade)
+  transaction           Transaction?
+
+  @@unique([senderId, receiverId]) // One pending request per pair
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([status])
+  @@map("connection_requests")
+}
+
+model Connection {
+  id                    String    @id @default(cuid())
+  user1Id               String
+  user2Id               String
+  status                String    @default("ACTIVE") // "ACTIVE" | "ENDED" | "BLOCKED"
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user1                 User      @relation("User1Connections", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2                 User      @relation("User2Connections", fields: [user2Id], references: [id], onDelete: Cascade)
+  messages              Message[]
+  sessions              Session[]
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([status])
+  @@map("connections")
+}
+
+// ==================== MESSAGING MODELS ====================
+
+model Message {
+  id                    String    @id @default(cuid())
+  connectionId          String
+  senderId              String
+  receiverId            String
+  content               String
+  isRead                Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  connection            Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  sender                User      @relation("SentBy", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver              User      @relation("ReceivedBy", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([isRead])
+  @@map("messages")
+}
+
+// ==================== SESSION MODELS ====================
+
+model SessionRequest {
+  id                    String    @id @default(cuid())
+  senderId              String
+  receiverId            String
+  skillId               String?
+  sessionName           String
+  status                String    @default("PENDING") // "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED"
+  creditsHeld           Int       @default(5) // Credits for session request
+  startDate             DateTime
+  endDate               DateTime
+  createdAt             DateTime  @default(now())
+  respondedAt           DateTime?
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  sender                User      @relation("SentBy", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver              User      @relation("ReceivedBy", fields: [receiverId], references: [id], onDelete: Cascade)
+  transaction           Transaction?
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([status])
+  @@map("session_requests")
+}
+
+model Session {
+  id                    String    @id @default(cuid())
+  learnerId             String
+  providerId            String
+  skillId               String
+  connectionId          String
+  sessionName           String
+  status                String    @default("ACTIVE") // "ACTIVE" | "COMPLETED" | "CANCELLED"
+  startDate             DateTime
+  endDate               DateTime
+  requestCredits        Int       @default(5) // Credits from session request
+  sessionCredits        Int       @default(40) // Credits for full session
+  createdAt             DateTime  @default(now())
+  completedAt           DateTime?
+  cancelledAt           DateTime?
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  learner               User      @relation("Learner", fields: [learnerId], references: [id], onDelete: Cascade)
+  provider              User      @relation("Provider", fields: [providerId], references: [id], onDelete: Cascade)
+  skill                 Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  connection            Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  completionRequests    SessionCompletion[]
+  reviews               Review[]
+  transactions          Transaction[]
+
+  @@index([learnerId])
+  @@index([providerId])
+  @@index([skillId])
+  @@index([connectionId])
+  @@index([status])
+  @@map("sessions")
+}
+
+model SessionCompletion {
+  id                    String    @id @default(cuid())
+  sessionId             String
+  requestedBy           String // User ID who requested completion/cancellation
+  status                String    @default("PENDING") // "PENDING" | "ACCEPTED" | "REJECTED"
+  completionType        String    // "COMPLETION" | "CANCELLATION"
+  createdAt             DateTime  @default(now())
+  respondedAt           DateTime?
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  session               Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([status])
+  @@map("session_completions")
+}
+
+// ==================== REVIEW & RATING MODELS ====================
+
+model Review {
+  id                    String    @id @default(cuid())
+  sessionId             String
+  reviewedUserId        String
+  reviewedByUserId      String
+  skillId               String
+  rating                Int       // 1-5 stars
+  teachingClarity       Int?      // 1-5
+  responsiveness        Int?      // 1-5
+  reliability           Int?      // 1-5
+  punctuality           Int?      // 1-5
+  comments              String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  session               Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  reviewedUser          User      @relation("ReviewedUser", fields: [reviewedUserId], references: [id], onDelete: Cascade)
+  reviewedBy            User      @relation("ReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: Cascade)
+  skill                 Skill     @relation("ReviewedSkill", fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, reviewedByUserId]) // One review per reviewer per session
+  @@index([sessionId])
+  @@index([reviewedUserId])
+  @@index([reviewedByUserId])
+  @@index([skillId])
+  @@map("reviews")
+}
+
+// ==================== WALLET & CREDIT MODELS ====================
+
+model Wallet {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  availableBalance      Float     @default(100) // Confirmed, completed credits
+  outgoingBalance       Float     @default(0) // Credits pending (reserved in outgoing)
+  incomingBalance       Float     @default(0) // Credits pending (reserved incoming)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions          Transaction[]
+
+  @@index([userId])
+  @@map("wallets")
+}
+
+model Transaction {
+  id                    String    @id @default(cuid())
+  walletId              String
+  amount                Float
+  type                  String    // "CONNECTION_REQUEST_SENT" | "CONNECTION_REQUEST_RECEIVED" | "CONNECTION_REQUEST_REFUNDED"
+                                  // "SESSION_REQUEST_SENT" | "SESSION_REQUEST_RECEIVED" | "SESSION_REQUEST_REFUNDED"
+                                  // "SESSION_COMPLETED" | "SESSION_CANCELLED" | "INITIAL_ALLOCATION"
+  status                String    @default("PENDING") // "PENDING" | "COMPLETED" | "REFUNDED" | "REVERSED"
+  relatedUserId         String?   // User involved in transaction
+  connectionRequestId   String?   @unique
+  sessionRequestId      String?   @unique
+  sessionId             String?
+  note                  String?
+  createdAt             DateTime  @default(now())
+  timestamp             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  wallet                Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  connectionRequest     ConnectionRequest? @relation(fields: [connectionRequestId], references: [id], onDelete: SetNull)
+  sessionRequest        SessionRequest? @relation(fields: [sessionRequestId], references: [id], onDelete: SetNull)
+  session               Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([walletId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+// ==================== NEWSFEED MODELS ====================
+
+model NewsfeedPost {
+  id                    String    @id @default(cuid())
+  authorId              String
+  skillId               String?
+  title                 String
+  content               String    @db.Text
+  mediaUrl              String?
+  hashtags              String?   // Comma-separated tags
+  viewCount             Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  author                User      @relation("Author", fields: [authorId], references: [id], onDelete: Cascade)
+  likes                 PostLike[]
+  comments              PostComment[]
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("newsfeed_posts")
+}
+
+model PostLike {
+  id                    String    @id @default(cuid())
+  postId                String
+  userId                String
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  post                  NewsfeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@map("post_likes")
+}
+
+model PostComment {
+  id                    String    @id @default(cuid())
+  postId                String
+  commenterId           String
+  content               String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  post                  NewsfeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commenter             User      @relation("Commenter", fields: [commenterId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([commenterId])
+  @@map("post_comments")
+}
+
+// ==================== NOTIFICATION MODELS ====================
+
+model Notification {
+  id                    String    @id @default(cuid())
+  userId                String
+  type                  String    // "CONNECTION_REQUEST" | "SESSION_REQUEST" | "SESSION_COMPLETED" 
+                                  // | "MESSAGE" | "REVIEW" | "POST_LIKE" | "POST_COMMENT"
+  title                 String
+  message               String
+  relatedUserId         String?
+  relatedEntityId       String?
+  relatedEntityType     String?   // "connection_request" | "session_request" | "session" | etc.
+  isRead                Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@map("notifications")
+}
+
+// ==================== ADMIN MODELS ====================
+
+model AdminLog {
+  id                    String    @id @default(cuid())
+  adminId               String
+  action                String    // "USER_SUSPENDED" | "USER_DELETED" | "CONTENT_REMOVED" | etc.
+  targetUserId          String?
+  targetEntityType      String?   // "user" | "post" | "comment" | etc.
+  targetEntityId        String?
+  reason                String?
+  details               String?   @db.Text
+  createdAt             DateTime  @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([targetUserId])
+  @@map("admin_logs")
+}
+
+model ReportedContent {
+  id                    String    @id @default(cuid())
+  reportedByUserId      String
+  reportedUserId        String?
+  contentType           String    // "post" | "comment" | "user" | "review"
+  contentId             String
+  reason                String
+  description           String?   @db.Text
+  status                String    @default("PENDING") // "PENDING" | "REVIEWED" | "DISMISSED" | "ACTIONED"
+  reviewedByAdminId     String?
+  action                String?   // "WARNING" | "SUSPENDED" | "DELETED" | "DISMISSED"
+  createdAt             DateTime  @default(now())
+  reviewedAt            DateTime?
+  updatedAt             DateTime  @updatedAt
+
+  @@index([reportedByUserId])
+  @@index([reportedUserId])
+  @@index([contentType])
+  @@index([status])
+  @@map("reported_content")
+}
