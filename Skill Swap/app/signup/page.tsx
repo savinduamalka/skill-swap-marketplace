@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -201,13 +202,10 @@ export default function SignupPage() {
   const handleGoogleSignup = async () => {
     try {
       setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      toast.info(
-        'Google signup will be available soon. Please use email registration.'
-      );
+      await signIn('google', { callbackUrl: '/dashboard' });
     } catch (error) {
       console.error('Google signup error:', error);
-      toast.error('Social signup is not available at the moment');
+      toast.error('Failed to initiate Google signup. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -219,13 +217,10 @@ export default function SignupPage() {
   const handleFacebookSignup = async () => {
     try {
       setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      toast.info(
-        'Facebook signup will be available soon. Please use email registration.'
-      );
+      await signIn('facebook', { callbackUrl: '/dashboard' });
     } catch (error) {
       console.error('Facebook signup error:', error);
-      toast.error('Social signup is not available at the moment');
+      toast.error('Failed to initiate Facebook signup. Please try again.');
     } finally {
       setLoading(false);
     }
