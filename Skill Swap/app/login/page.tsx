@@ -10,9 +10,9 @@
  * @version 1.0.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +50,7 @@ interface FormData {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -61,6 +62,16 @@ export default function LoginPage() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+
+  // Check for callbackUrl indicating logout redirect
+  useEffect(() => {
+    const callbackUrl = searchParams.get('callbackUrl');
+    if (callbackUrl === '/login') {
+      toast.success('You have been logged out successfully');
+      // Clean up the URL
+      window.history.replaceState({}, '', '/login');
+    }
+  }, [searchParams]);
 
   /**
    * Validates the login form fields
@@ -100,32 +111,35 @@ export default function LoginPage() {
     setErrors({});
 
     try {
-      // Simulate loading delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       // Store remember me preference
       if (rememberMe) {
         localStorage.setItem('skillswap_remember', 'true');
       }
 
-      // Store mock user data for development
-      localStorage.setItem(
-        'skillswap_dev_user',
-        JSON.stringify({
-          email: formData.email,
-          id: 'dev-user-123',
-          user_metadata: {
-            fullName: 'Dev User',
-          },
-        })
-      );
+      const result = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      });
 
-      toast.success('Welcome back! Login successful.');
+      if (result?.error) {
+        toast.error('Invalid email or password. Please try again.');
+        setErrors({
+          general: 'Invalid email or password',
+        });
+        return;
+      }
+
+      toast.success('Welcome back! Login successful.', {
+        description: 'Redirecting to dashboard...',
+        icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+      });
 
       // Navigate to dashboard
       setTimeout(() => {
         router.push('/dashboard');
-      }, 500);
+        router.refresh();
+      }, 1000);
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -147,7 +161,9 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
-      await signIn('google', { callbackUrl: '/dashboard' });
+      // Store a flag to show success message after redirect
+      sessionStorage.setItem('skillswap_oauth_pending', 'google');
+      await signIn('google', { callbackUrl: '/dashboard?login=success' });
     } catch (error) {
       console.error('Google login error:', error);
       toast.error('Failed to initiate Google login. Please try again.');
@@ -162,7 +178,9 @@ export default function LoginPage() {
   const handleFacebookLogin = async () => {
     try {
       setLoading(true);
-      await signIn('facebook', { callbackUrl: '/dashboard' });
+      // Store a flag to show success message after redirect
+      sessionStorage.setItem('skillswap_oauth_pending', 'facebook');
+      await signIn('facebook', { callbackUrl: '/dashboard?login=success' });
     } catch (error) {
       console.error('Facebook login error:', error);
       toast.error('Failed to initiate Facebook login. Please try again.');

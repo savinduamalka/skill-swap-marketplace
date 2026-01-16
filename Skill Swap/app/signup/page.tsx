@@ -160,27 +160,55 @@ export default function SignupPage() {
     setErrors({});
 
     try {
-      // Simulate loading delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Store user data for development
-      localStorage.setItem(
-        'skillswap_dev_user',
-        JSON.stringify({
+      // Call registration API
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: formData.email,
-          id: `user-${Date.now()}`,
-          user_metadata: {
-            fullName: formData.fullName,
-          },
-        })
-      );
+          password: formData.password,
+          fullName: formData.fullName,
+        }),
+      });
 
-      toast.success('Account created successfully! Welcome to SkillSwap.');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+
+      toast.success('Account created successfully!', {
+        description: 'Signing you in...',
+        icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+      });
+
+      // Auto sign in after registration
+      const signInResult = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        toast.error(
+          'Account created but sign in failed. Please try logging in.'
+        );
+        router.push('/login');
+        return;
+      }
+
+      toast.success('Welcome to SkillSwap!', {
+        description: 'You received 100 credits to get started.',
+        icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+      });
 
       // Navigate to dashboard
       setTimeout(() => {
         router.push('/dashboard');
-      }, 500);
+        router.refresh();
+      }, 1000);
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -202,7 +230,8 @@ export default function SignupPage() {
   const handleGoogleSignup = async () => {
     try {
       setLoading(true);
-      await signIn('google', { callbackUrl: '/dashboard' });
+      sessionStorage.setItem('skillswap_oauth_pending', 'google');
+      await signIn('google', { callbackUrl: '/dashboard?login=success' });
     } catch (error) {
       console.error('Google signup error:', error);
       toast.error('Failed to initiate Google signup. Please try again.');
@@ -217,7 +246,8 @@ export default function SignupPage() {
   const handleFacebookSignup = async () => {
     try {
       setLoading(true);
-      await signIn('facebook', { callbackUrl: '/dashboard' });
+      sessionStorage.setItem('skillswap_oauth_pending', 'facebook');
+      await signIn('facebook', { callbackUrl: '/dashboard?login=success' });
     } catch (error) {
       console.error('Facebook signup error:', error);
       toast.error('Failed to initiate Facebook signup. Please try again.');
