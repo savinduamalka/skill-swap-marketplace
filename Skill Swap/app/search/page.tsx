@@ -85,12 +85,33 @@ async function searchSkills(
     : undefined;
   const page = Math.max(1, parseInt(searchParams.page || '1'));
 
+  // Get blocked user IDs (users current user blocked + users who blocked current user)
+  const [blockedByMe, blockedMe] = await Promise.all([
+    prisma.blockedUser.findMany({
+      where: { blockerId: currentUserId },
+      select: { blockedId: true },
+    }),
+    prisma.blockedUser.findMany({
+      where: { blockedId: currentUserId },
+      select: { blockerId: true },
+    }),
+  ]);
+
+  const blockedUserIds = [
+    ...blockedByMe.map((b) => b.blockedId),
+    ...blockedMe.map((b) => b.blockerId),
+  ];
+
   // Build where clause for filtering
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const whereClause: any = {
     isTeaching: true,
     // Exclude current user's skills
-    ownerId: { not: currentUserId },
+    ownerId: {
+      not: currentUserId,
+      // Exclude blocked users' skills
+      notIn: blockedUserIds.length > 0 ? blockedUserIds : undefined,
+    },
     // Search query - search in name AND alternativeNames
     OR: [
       { name: { contains: query, mode: 'insensitive' } },

@@ -16,9 +16,11 @@ import {
   Users,
   CheckCircle2,
   BookOpen,
+  Ban,
 } from 'lucide-react';
 import { ConnectButton } from '@/components/connect-button';
 import { BackButton } from '@/components/back-button';
+import { BlockUserButton } from '@/components/block-user-button';
 
 // Force dynamic rendering to always get fresh connection status
 export const dynamic = 'force-dynamic';
@@ -208,6 +210,51 @@ async function checkConnectionStatus(
 }
 
 /**
+ * Check if users have blocked each other
+ */
+async function checkBlockStatus(
+  currentUserId: string,
+  profileUserId: string
+): Promise<{
+  isBlockedByMe: boolean;
+  hasBlockedMe: boolean;
+}> {
+  try {
+    const [blockedByMe, blockedMe] = await Promise.all([
+      // Current user blocked the profile user
+      prisma.blockedUser.findUnique({
+        where: {
+          blockerId_blockedId: {
+            blockerId: currentUserId,
+            blockedId: profileUserId,
+          },
+        },
+      }),
+      // Profile user blocked the current user
+      prisma.blockedUser.findUnique({
+        where: {
+          blockerId_blockedId: {
+            blockerId: profileUserId,
+            blockedId: currentUserId,
+          },
+        },
+      }),
+    ]);
+
+    return {
+      isBlockedByMe: !!blockedByMe,
+      hasBlockedMe: !!blockedMe,
+    };
+  } catch (error) {
+    console.error('Error checking block status:', error);
+    return {
+      isBlockedByMe: false,
+      hasBlockedMe: false,
+    };
+  }
+}
+
+/**
  * Calculate average rating from reviews
  */
 function calculateAverageRating(reviews: { rating: number }[]): number | null {
@@ -281,8 +328,40 @@ export default async function UserProfilePage({
     notFound();
   }
 
+  const [connectionStatus, blockStatus] = await Promise.all([
+    checkConnectionStatus(session.user.id, userId),
+    checkBlockStatus(session.user.id, userId),
+  ]);
+
   const { isConnected, hasPendingRequest, isSentByCurrentUser } =
-    await checkConnectionStatus(session.user.id, userId);
+    connectionStatus;
+  const { isBlockedByMe, hasBlockedMe } = blockStatus;
+
+  // If the profile user has blocked the current user, show blocked message
+  if (hasBlockedMe) {
+    return (
+      <>
+        <Header />
+        <main className="pb-20 md:pb-0">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <BackButton fallbackHref="/search" fallbackLabel="Back" />
+            <Card className="p-8 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                  <Ban className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h2 className="text-xl font-semibold">Profile Unavailable</h2>
+                <p className="text-muted-foreground max-w-md">
+                  This profile is not available to view.
+                </p>
+              </div>
+            </Card>
+          </div>
+        </main>
+        <MobileNav />
+      </>
+    );
+  }
 
   const averageRating = calculateAverageRating(profile.reviewsReceived);
   const totalConnections =
@@ -368,6 +447,11 @@ export default async function UserProfilePage({
                       isConnected={isConnected}
                       hasPendingRequest={hasPendingRequest}
                       isSentByCurrentUser={isSentByCurrentUser}
+                    />
+                    <BlockUserButton
+                      userId={profile.id}
+                      userName={displayName}
+                      isBlocked={isBlockedByMe}
                     />
                   </div>
                 </div>
