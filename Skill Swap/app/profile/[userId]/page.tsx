@@ -1,5 +1,4 @@
 import { notFound, redirect } from 'next/navigation';
-import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Header } from '@/components/layout/header';
@@ -17,9 +16,9 @@ import {
   Users,
   CheckCircle2,
   BookOpen,
-  ArrowLeft,
 } from 'lucide-react';
 import { ConnectButton } from '@/components/connect-button';
+import { BackButton } from '@/components/back-button';
 
 // Force dynamic rendering to always get fresh connection status
 export const dynamic = 'force-dynamic';
@@ -297,13 +296,7 @@ export default async function UserProfilePage({
       <main className="pb-20 md:pb-0">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Back Button */}
-          <Link
-            href="/search"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Search
-          </Link>
+          <BackButton fallbackHref="/search" fallbackLabel="Back" />
 
           {/* Profile Header */}
           <Card className="p-6 mb-6">
