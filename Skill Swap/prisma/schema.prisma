@@ -113,9 +113,30 @@ model User {
   postComments          PostComment[]             @relation("Commenter")
   notifications         Notification[]
   searchHistory         SearchHistory[]
+  blockedUsers          BlockedUser[]             @relation("Blocker")
+  blockedBy             BlockedUser[]             @relation("Blocked")
 
   @@index([email])
   @@map("users")
+}
+
+// ==================== BLOCKED USER MODEL ====================
+
+model BlockedUser {
+  id                    String    @id @default(cuid())
+  blockerId             String    // User who blocked
+  blockedId             String    // User who was blocked
+  reason                String?   // Optional reason for blocking
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  blocker               User      @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked               User      @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId]) // Can only block a user once
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("blocked_users")
 }
 
 // ==================== SKILL MODELS ====================
