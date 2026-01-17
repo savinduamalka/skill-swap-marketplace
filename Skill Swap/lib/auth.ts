@@ -118,6 +118,24 @@ const fullAuthConfig: NextAuthConfig = {
         token.picture = user.image;
       }
 
+      // Refresh user data (e.g., updated avatar) on subsequent checks
+      if (!user && token?.id) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { image: true, name: true, email: true },
+          });
+
+          if (dbUser) {
+            token.picture = dbUser.image;
+            token.name = dbUser.name || (token.name as string);
+            token.email = dbUser.email || (token.email as string);
+          }
+        } catch (error) {
+          console.error('JWT callback refresh error:', error);
+        }
+      }
+
       // Add provider info on initial sign in
       if (account) {
         token.provider = account.provider;
