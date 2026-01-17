@@ -39,29 +39,27 @@ export async function GET(
             fullName: true,
             name: true,
             image: true,
+            skillsOffered: {
+              select: { name: true },
+            },
           },
         },
         likes: {
           where: { userId: session?.user?.id },
           select: { id: true },
         },
-        comments: {
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+          },
+        },
+        savedBy: {
+          where: { userId: session?.user?.id },
           select: { id: true },
         },
       },
     });
-
-    // Get user's skills for display
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        skillsOffered: {
-          select: { name: true },
-        },
-      },
-    });
-
-    const skillsOffered = user?.skillsOffered.map((s) => s.name) || [];
 
     return NextResponse.json({
       posts: posts.map((post) => ({
@@ -69,19 +67,23 @@ export async function GET(
         title: post.title,
         content: post.content,
         mediaUrl: post.mediaUrl,
-        hashtags: post.hashtags?.split(',').filter(Boolean) || [],
+        hashtags:
+          post.hashtags
+            ?.split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean) || [],
         viewCount: post.viewCount,
         createdAt: post.createdAt,
-        updatedAt: post.updatedAt,
         author: {
           id: post.author.id,
           name: post.author.fullName || post.author.name || 'Anonymous',
           image: post.author.image,
-          skills: skillsOffered,
+          skills: post.author.skillsOffered.map((s) => s.name),
         },
-        likesCount: post.likes.length,
-        commentsCount: post.comments.length,
+        likesCount: post._count.likes,
+        commentsCount: post._count.comments,
         isLiked: post.likes.length > 0,
+        isSaved: post.savedBy.length > 0,
       })),
     });
   } catch (error) {
