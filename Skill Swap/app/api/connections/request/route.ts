@@ -51,8 +51,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (!receiver) {
+      console.log('[Connection Request] User not found:', receiverId);
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+
+    console.log(
+      '[Connection Request] Sender:',
+      senderId,
+      'Receiver:',
+      receiverId
+    );
 
     // Check if already connected
     const existingConnection = await prisma.connection.findFirst({
@@ -65,6 +73,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingConnection) {
+      console.log('[Connection Request] Blocked: Already connected');
       return NextResponse.json(
         { error: 'You are already connected with this user' },
         { status: 400 }
@@ -82,6 +91,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingRequest) {
+      console.log(
+        '[Connection Request] Blocked: Pending request exists',
+        existingRequest.id
+      );
       return NextResponse.json(
         {
           error:
@@ -97,14 +110,24 @@ export async function POST(request: NextRequest) {
     });
 
     if (!senderWallet) {
+      console.log('[Connection Request] Blocked: No wallet found');
       return NextResponse.json(
         { error: 'Wallet not found. Please contact support.' },
         { status: 400 }
       );
     }
 
+    console.log(
+      '[Connection Request] Wallet balance:',
+      senderWallet.availableBalance
+    );
+
     // Check if sender has sufficient available balance
     if (senderWallet.availableBalance < CONNECTION_COST) {
+      console.log(
+        '[Connection Request] Blocked: Insufficient balance',
+        senderWallet.availableBalance
+      );
       return NextResponse.json(
         {
           error: 'Insufficient balance',
@@ -116,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     // Use a transaction to ensure atomicity
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create the connection request
+      // Create a new connection request
       const connectionRequest = await tx.connectionRequest.create({
         data: {
           senderId,
@@ -126,7 +149,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 2. Update sender's wallet - move credits from available to outgoing
+      // Update sender's wallet - move credits from available to outgoing
       await tx.wallet.update({
         where: { userId: senderId },
         data: {
@@ -135,7 +158,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 3. Create a transaction record for tracking
+      // Create a transaction record for tracking
       await tx.transaction.create({
         data: {
           walletId: senderWallet.id,
