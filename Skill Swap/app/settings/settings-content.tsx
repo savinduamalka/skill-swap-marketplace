@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 import {
   User,
   Mail,
@@ -262,7 +263,10 @@ export function SettingsContent({ user }: SettingsContentProps) {
       }
 
       toast.success('Account deleted successfully');
-      router.push('/');
+
+      // Use signOut from next-auth/react to properly clear session cookies
+      // This will clear all auth cookies and redirect to home page
+      await signOut({ callbackUrl: '/', redirect: true });
     } catch (error) {
       console.error('Error deleting account:', error);
       toast.error(
@@ -902,17 +906,21 @@ export function SettingsContent({ user }: SettingsContentProps) {
                       <AlertDialogTitle>
                         Are you absolutely sure?
                       </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently
-                        delete your account and remove all your data from our
-                        servers, including:
-                        <ul className="list-disc list-inside mt-2 space-y-1">
-                          <li>Your profile and settings</li>
-                          <li>All your skills and learning goals</li>
-                          <li>Your connections and messages</li>
-                          <li>Session history and reviews</li>
-                          <li>Your wallet and transaction history</li>
-                        </ul>
+                      <AlertDialogDescription asChild>
+                        <div>
+                          <p>
+                            This action cannot be undone. This will permanently
+                            delete your account and remove all your data from
+                            our servers, including:
+                          </p>
+                          <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground text-sm">
+                            <li>Your profile and settings</li>
+                            <li>All your skills and learning goals</li>
+                            <li>Your connections and messages</li>
+                            <li>Session history and reviews</li>
+                            <li>Your wallet and transaction history</li>
+                          </ul>
+                        </div>
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
