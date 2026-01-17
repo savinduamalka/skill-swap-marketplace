@@ -59,7 +59,30 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
+
+// Proficiency levels
+const PROFICIENCY_LEVELS = [
+  { value: 'Beginner', label: 'Beginner' },
+  { value: 'Intermediate', label: 'Intermediate' },
+  { value: 'Advanced', label: 'Advanced' },
+  { value: 'Expert', label: 'Expert' },
+];
+
+// Teaching formats
+const TEACHING_FORMATS = [
+  { value: 'Online', label: 'Online' },
+  { value: 'In-Person', label: 'In-Person' },
+  { value: 'Hybrid', label: 'Hybrid' },
+];
 
 // Types
 interface SkillOffered {
@@ -147,6 +170,28 @@ export function SettingsContent({ user }: SettingsContentProps) {
   const [profileVisibility, setProfileVisibility] = useState('public');
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [allowMessages, setAllowMessages] = useState('everyone');
+
+  // Skills I Can Teach modal state
+  const [isAddSkillOpen, setIsAddSkillOpen] = useState(false);
+  const [isEditSkillOpen, setIsEditSkillOpen] = useState(false);
+  const [editingSkill, setEditingSkill] = useState<SkillOffered | null>(null);
+  const [skillName, setSkillName] = useState('');
+  const [skillDescription, setSkillDescription] = useState('');
+  const [skillProficiency, setSkillProficiency] = useState('');
+  const [skillYears, setSkillYears] = useState('');
+  const [skillFormat, setSkillFormat] = useState('');
+  const [isSavingSkill, setIsSavingSkill] = useState(false);
+
+  // Skills I Want to Learn modal state
+  const [isAddSkillWantOpen, setIsAddSkillWantOpen] = useState(false);
+  const [isEditSkillWantOpen, setIsEditSkillWantOpen] = useState(false);
+  const [editingSkillWant, setEditingSkillWant] = useState<SkillWanted | null>(
+    null
+  );
+  const [skillWantName, setSkillWantName] = useState('');
+  const [skillWantDescription, setSkillWantDescription] = useState('');
+  const [skillWantTarget, setSkillWantTarget] = useState('');
+  const [isSavingSkillWant, setIsSavingSkillWant] = useState(false);
 
   // Get user initials for avatar fallback
   const getInitials = (name: string | null) => {
@@ -273,6 +318,271 @@ export function SettingsContent({ user }: SettingsContentProps) {
         error instanceof Error ? error.message : 'Failed to delete account'
       );
     }
+  };
+
+  // Reset skill form
+  const resetSkillForm = () => {
+    setSkillName('');
+    setSkillDescription('');
+    setSkillProficiency('');
+    setSkillYears('');
+    setSkillFormat('');
+    setEditingSkill(null);
+  };
+
+  // Reset skill want form
+  const resetSkillWantForm = () => {
+    setSkillWantName('');
+    setSkillWantDescription('');
+    setSkillWantTarget('');
+    setEditingSkillWant(null);
+  };
+
+  // Handle add skill (Skills I Can Teach)
+  const handleAddSkill = async () => {
+    if (
+      !skillName.trim() ||
+      !skillDescription.trim() ||
+      !skillProficiency ||
+      !skillYears ||
+      !skillFormat
+    ) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setIsSavingSkill(true);
+
+    try {
+      const response = await fetch('/api/user/skills', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: skillName.trim(),
+          description: skillDescription.trim(),
+          proficiencyLevel: skillProficiency,
+          yearsOfExperience: parseInt(skillYears),
+          teachingFormat: skillFormat,
+          timeZone: user.timeZone || 'UTC',
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to add skill');
+      }
+
+      toast.success('Skill added successfully!');
+      setIsAddSkillOpen(false);
+      resetSkillForm();
+      startTransition(() => router.refresh());
+    } catch (error) {
+      console.error('Error adding skill:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to add skill'
+      );
+    } finally {
+      setIsSavingSkill(false);
+    }
+  };
+
+  // Handle edit skill
+  const handleEditSkill = async () => {
+    if (
+      !editingSkill ||
+      !skillName.trim() ||
+      !skillDescription.trim() ||
+      !skillProficiency ||
+      !skillYears ||
+      !skillFormat
+    ) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setIsSavingSkill(true);
+
+    try {
+      const response = await fetch('/api/user/skills', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingSkill.id,
+          name: skillName.trim(),
+          description: skillDescription.trim(),
+          proficiencyLevel: skillProficiency,
+          yearsOfExperience: parseInt(skillYears),
+          teachingFormat: skillFormat,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update skill');
+      }
+
+      toast.success('Skill updated successfully!');
+      setIsEditSkillOpen(false);
+      resetSkillForm();
+      startTransition(() => router.refresh());
+    } catch (error) {
+      console.error('Error updating skill:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update skill'
+      );
+    } finally {
+      setIsSavingSkill(false);
+    }
+  };
+
+  // Handle delete skill
+  const handleDeleteSkill = async (skillId: string) => {
+    try {
+      const response = await fetch(`/api/user/skills?id=${skillId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete skill');
+      }
+
+      toast.success('Skill deleted successfully!');
+      startTransition(() => router.refresh());
+    } catch (error) {
+      console.error('Error deleting skill:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete skill'
+      );
+    }
+  };
+
+  // Open edit skill modal
+  const openEditSkillModal = (skill: SkillOffered) => {
+    setEditingSkill(skill);
+    setSkillName(skill.name);
+    setSkillDescription(skill.description);
+    setSkillProficiency(skill.proficiencyLevel);
+    setSkillYears(skill.yearsOfExperience.toString());
+    setSkillFormat(skill.teachingFormat);
+    setIsEditSkillOpen(true);
+  };
+
+  // Handle add skill want (Skills I Want to Learn)
+  const handleAddSkillWant = async () => {
+    if (!skillWantName.trim()) {
+      toast.error('Please enter a skill name');
+      return;
+    }
+
+    setIsSavingSkillWant(true);
+
+    try {
+      const response = await fetch('/api/user/skills-wanted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: skillWantName.trim(),
+          description: skillWantDescription.trim() || null,
+          proficiencyTarget: skillWantTarget || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to add learning goal');
+      }
+
+      toast.success('Learning goal added successfully!');
+      setIsAddSkillWantOpen(false);
+      resetSkillWantForm();
+      startTransition(() => router.refresh());
+    } catch (error) {
+      console.error('Error adding learning goal:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to add learning goal'
+      );
+    } finally {
+      setIsSavingSkillWant(false);
+    }
+  };
+
+  // Handle edit skill want
+  const handleEditSkillWant = async () => {
+    if (!editingSkillWant || !skillWantName.trim()) {
+      toast.error('Please enter a skill name');
+      return;
+    }
+
+    setIsSavingSkillWant(true);
+
+    try {
+      const response = await fetch('/api/user/skills-wanted', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingSkillWant.id,
+          name: skillWantName.trim(),
+          description: skillWantDescription.trim() || null,
+          proficiencyTarget: skillWantTarget || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update learning goal');
+      }
+
+      toast.success('Learning goal updated successfully!');
+      setIsEditSkillWantOpen(false);
+      resetSkillWantForm();
+      startTransition(() => router.refresh());
+    } catch (error) {
+      console.error('Error updating learning goal:', error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update learning goal'
+      );
+    } finally {
+      setIsSavingSkillWant(false);
+    }
+  };
+
+  // Handle delete skill want
+  const handleDeleteSkillWant = async (skillWantId: string) => {
+    try {
+      const response = await fetch(
+        `/api/user/skills-wanted?id=${skillWantId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete learning goal');
+      }
+
+      toast.success('Learning goal deleted successfully!');
+      startTransition(() => router.refresh());
+    } catch (error) {
+      console.error('Error deleting learning goal:', error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to delete learning goal'
+      );
+    }
+  };
+
+  // Open edit skill want modal
+  const openEditSkillWantModal = (skillWant: SkillWanted) => {
+    setEditingSkillWant(skillWant);
+    setSkillWantName(skillWant.name);
+    setSkillWantDescription(skillWant.description || '');
+    setSkillWantTarget(skillWant.proficiencyTarget || '');
+    setIsEditSkillWantOpen(true);
   };
 
   return (
@@ -579,7 +889,13 @@ export function SettingsContent({ user }: SettingsContentProps) {
                   Skills you can share with others in the community
                 </CardDescription>
               </div>
-              <Button size="sm">
+              <Button
+                size="sm"
+                onClick={() => {
+                  resetSkillForm();
+                  setIsAddSkillOpen(true);
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Skill
               </Button>
@@ -627,16 +943,42 @@ export function SettingsContent({ user }: SettingsContentProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="icon" variant="ghost">
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="text-destructive"
+                        onClick={() => openEditSkillModal(skill)}
                       >
-                        <X className="h-4 w-4" />
+                        <Edit2 className="h-4 w-4" />
                       </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Skill</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{skill.name}"?
+                              This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteSkill(skill.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 ))}
@@ -655,7 +997,13 @@ export function SettingsContent({ user }: SettingsContentProps) {
                   Skills you're interested in learning from others
                 </CardDescription>
               </div>
-              <Button size="sm">
+              <Button
+                size="sm"
+                onClick={() => {
+                  resetSkillWantForm();
+                  setIsAddSkillWantOpen(true);
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Skill
               </Button>
@@ -693,16 +1041,44 @@ export function SettingsContent({ user }: SettingsContentProps) {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="icon" variant="ghost">
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="text-destructive"
+                        onClick={() => openEditSkillWantModal(skill)}
                       >
-                        <X className="h-4 w-4" />
+                        <Edit2 className="h-4 w-4" />
                       </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Delete Learning Goal
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{skill.name}"?
+                              This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteSkillWant(skill.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 ))}
@@ -710,6 +1086,350 @@ export function SettingsContent({ user }: SettingsContentProps) {
             )}
           </CardContent>
         </Card>
+
+        {/* Add Skill Modal */}
+        <Dialog open={isAddSkillOpen} onOpenChange={setIsAddSkillOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Add New Skill</DialogTitle>
+              <DialogDescription>
+                Add a skill you can teach to others in the community
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-skill-name">Skill Name *</Label>
+                <Input
+                  id="add-skill-name"
+                  placeholder="e.g., JavaScript, Guitar, Cooking"
+                  value={skillName}
+                  onChange={(e) => setSkillName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-skill-description">Description *</Label>
+                <Textarea
+                  id="add-skill-description"
+                  placeholder="Describe what you can teach and your approach..."
+                  value={skillDescription}
+                  onChange={(e) => setSkillDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Proficiency Level *</Label>
+                  <Select
+                    value={skillProficiency}
+                    onValueChange={setSkillProficiency}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROFICIENCY_LEVELS.map((level) => (
+                        <SelectItem key={level.value} value={level.value}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add-skill-years">Years of Experience *</Label>
+                  <Input
+                    id="add-skill-years"
+                    type="number"
+                    min="0"
+                    placeholder="e.g., 5"
+                    value={skillYears}
+                    onChange={(e) => setSkillYears(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Teaching Format *</Label>
+                <Select value={skillFormat} onValueChange={setSkillFormat}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEACHING_FORMATS.map((format) => (
+                      <SelectItem key={format.value} value={format.value}>
+                        {format.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsAddSkillOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddSkill} disabled={isSavingSkill}>
+                {isSavingSkill ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  'Add Skill'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Skill Modal */}
+        <Dialog open={isEditSkillOpen} onOpenChange={setIsEditSkillOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Edit Skill</DialogTitle>
+              <DialogDescription>
+                Update the details of your skill
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-skill-name">Skill Name *</Label>
+                <Input
+                  id="edit-skill-name"
+                  placeholder="e.g., JavaScript, Guitar, Cooking"
+                  value={skillName}
+                  onChange={(e) => setSkillName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-skill-description">Description *</Label>
+                <Textarea
+                  id="edit-skill-description"
+                  placeholder="Describe what you can teach and your approach..."
+                  value={skillDescription}
+                  onChange={(e) => setSkillDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Proficiency Level *</Label>
+                  <Select
+                    value={skillProficiency}
+                    onValueChange={setSkillProficiency}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROFICIENCY_LEVELS.map((level) => (
+                        <SelectItem key={level.value} value={level.value}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-skill-years">
+                    Years of Experience *
+                  </Label>
+                  <Input
+                    id="edit-skill-years"
+                    type="number"
+                    min="0"
+                    placeholder="e.g., 5"
+                    value={skillYears}
+                    onChange={(e) => setSkillYears(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Teaching Format *</Label>
+                <Select value={skillFormat} onValueChange={setSkillFormat}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEACHING_FORMATS.map((format) => (
+                      <SelectItem key={format.value} value={format.value}>
+                        {format.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditSkillOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleEditSkill} disabled={isSavingSkill}>
+                {isSavingSkill ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Skill Want Modal */}
+        <Dialog open={isAddSkillWantOpen} onOpenChange={setIsAddSkillWantOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Add Learning Goal</DialogTitle>
+              <DialogDescription>
+                Add a skill you want to learn from others
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-skill-want-name">Skill Name *</Label>
+                <Input
+                  id="add-skill-want-name"
+                  placeholder="e.g., Piano, Machine Learning, Photography"
+                  value={skillWantName}
+                  onChange={(e) => setSkillWantName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-skill-want-description">
+                  Description (Optional)
+                </Label>
+                <Textarea
+                  id="add-skill-want-description"
+                  placeholder="What specifically would you like to learn?"
+                  value={skillWantDescription}
+                  onChange={(e) => setSkillWantDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Target Proficiency (Optional)</Label>
+                <Select
+                  value={skillWantTarget}
+                  onValueChange={setSkillWantTarget}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select target level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROFICIENCY_LEVELS.map((level) => (
+                      <SelectItem key={level.value} value={level.value}>
+                        {level.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsAddSkillWantOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddSkillWant} disabled={isSavingSkillWant}>
+                {isSavingSkillWant ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  'Add Learning Goal'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Skill Want Modal */}
+        <Dialog
+          open={isEditSkillWantOpen}
+          onOpenChange={setIsEditSkillWantOpen}
+        >
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Edit Learning Goal</DialogTitle>
+              <DialogDescription>
+                Update the details of your learning goal
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-skill-want-name">Skill Name *</Label>
+                <Input
+                  id="edit-skill-want-name"
+                  placeholder="e.g., Piano, Machine Learning, Photography"
+                  value={skillWantName}
+                  onChange={(e) => setSkillWantName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-skill-want-description">
+                  Description (Optional)
+                </Label>
+                <Textarea
+                  id="edit-skill-want-description"
+                  placeholder="What specifically would you like to learn?"
+                  value={skillWantDescription}
+                  onChange={(e) => setSkillWantDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Target Proficiency (Optional)</Label>
+                <Select
+                  value={skillWantTarget}
+                  onValueChange={setSkillWantTarget}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select target level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROFICIENCY_LEVELS.map((level) => (
+                      <SelectItem key={level.value} value={level.value}>
+                        {level.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditSkillWantOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleEditSkillWant}
+                disabled={isSavingSkillWant}
+              >
+                {isSavingSkillWant ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </TabsContent>
 
       {/* Notifications Tab */}
