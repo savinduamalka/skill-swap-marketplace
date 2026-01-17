@@ -153,6 +153,11 @@ export function SettingsContent({ user }: SettingsContentProps) {
   const [timeZone, setTimeZone] = useState(user.timeZone || 'UTC');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Avatar upload state
+  const [avatarUrl, setAvatarUrl] = useState(user.image);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -207,6 +212,76 @@ export function SettingsContent({ user }: SettingsContentProps) {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  // Handle avatar file selection and upload
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only JPEG, PNG, WebP, and GIF images are allowed');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload file
+    setIsUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/user/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload image');
+      }
+
+      setAvatarUrl(data.imageUrl);
+      setAvatarPreview(null);
+      toast.success('Profile image updated successfully!');
+
+      // Small delay to ensure upload is complete before refresh
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Hard page reload to ensure real-time update in header and everywhere
+      // This guarantees the session and UI are fully synchronized
+      window.location.reload();
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to upload image'
+      );
+      setAvatarPreview(null);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  // Handle avatar upload button click
+  const handleAvatarButtonClick = () => {
+    const input = document.getElementById('avatar-input') as HTMLInputElement;
+    input?.click();
   };
 
   // Handle account update
@@ -657,7 +732,10 @@ export function SettingsContent({ user }: SettingsContentProps) {
             <div className="flex items-center gap-6">
               <div className="relative">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={user.image || undefined} alt={fullName} />
+                  <AvatarImage
+                    src={avatarPreview || avatarUrl || undefined}
+                    alt={fullName}
+                  />
                   <AvatarFallback className="text-2xl bg-primary/10 text-primary">
                     {getInitials(fullName || user.name)}
                   </AvatarFallback>
@@ -666,9 +744,23 @@ export function SettingsContent({ user }: SettingsContentProps) {
                   size="icon"
                   variant="outline"
                   className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"
+                  onClick={handleAvatarButtonClick}
+                  disabled={isUploadingAvatar}
                 >
-                  <Camera className="h-4 w-4" />
+                  {isUploadingAvatar ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
                 </Button>
+                <input
+                  id="avatar-input"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                  disabled={isUploadingAvatar}
+                />
               </div>
               <div>
                 <h3 className="font-medium">
