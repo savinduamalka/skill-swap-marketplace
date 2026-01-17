@@ -43,6 +43,7 @@ export const authConfig: NextAuthConfig = {
       return true;
     },
   },
+  // JWT strategy for Edge middleware compatibility
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days

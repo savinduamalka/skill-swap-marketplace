@@ -10,6 +10,7 @@ import { authConfig } from './auth.config';
 
 /**
  * Full NextAuth configuration with Prisma adapter
+ * Uses JWT strategy for Edge middleware compatibility
  */
 const fullAuthConfig: NextAuthConfig = {
   ...authConfig,
@@ -58,7 +59,7 @@ const fullAuthConfig: NextAuthConfig = {
             id: user.id,
             email: user.email,
             name: user.fullName || user.name,
-            image: user.avatarUrl || user.image,
+            image: user.image,
           };
         } catch (error) {
           console.error('Authorize error:', error);
@@ -67,7 +68,7 @@ const fullAuthConfig: NextAuthConfig = {
       },
     }),
   ],
-  // Use JWT strategy for all providers (including credentials)
+  // Use JWT strategy for Edge middleware compatibility
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -108,28 +109,27 @@ const fullAuthConfig: NextAuthConfig = {
     /**
      * JWT callback - called whenever a JWT is created or updated
      */
-    async jwt({ token, user, account, trigger }) {
+    async jwt({ token, user, account }) {
+      // Initial sign in - add user data to token
       if (user) {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
         token.picture = user.image;
       }
+
+      // Add provider info on initial sign in
       if (account) {
-        token.accessToken = account.access_token;
         token.provider = account.provider;
       }
-      // Add flag to indicate new login
-      if (trigger === 'signIn') {
-        token.isNewLogin = true;
-      }
+
       return token;
     },
     /**
      * Session callback - called whenever a session is checked
      */
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
@@ -141,49 +141,19 @@ const fullAuthConfig: NextAuthConfig = {
      * SignIn callback - called when user signs in
      */
     async signIn({ user, account }) {
-      // Allow OAuth sign ins
+      // Allow all sign ins
       if (account?.provider === 'google' || account?.provider === 'facebook') {
         return true;
       }
-      // Allow credentials sign in
       if (account?.provider === 'credentials') {
         return true;
       }
       return true;
     },
-    /**
-     * Authorized callback - controls access to pages
-     */
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user;
-      const pathname = nextUrl.pathname;
-
-      // Public routes that don't require authentication
-      const publicRoutes = ['/', '/login', '/signup'];
-      const isPublicRoute = publicRoutes.includes(pathname);
-
-      // Auth routes (login/signup) - redirect to dashboard if already logged in
-      const isAuthRoute = pathname === '/login' || pathname === '/signup';
-
-      if (isAuthRoute && isLoggedIn) {
-        return Response.redirect(new URL('/dashboard', nextUrl));
-      }
-
-      // Allow public routes
-      if (isPublicRoute) {
-        return true;
-      }
-
-      // All other routes require authentication
-      if (!isLoggedIn) {
-        return Response.redirect(new URL('/login', nextUrl));
-      }
-
-      return true;
-    },
   },
   trustHost: true,
-  debug: process.env.NODE_ENV === 'development',
+  // Disable debug to prevent sensitive data logging
+  debug: false,
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(fullAuthConfig);

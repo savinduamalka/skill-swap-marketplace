@@ -31,6 +31,29 @@ model Account {
   @@map("accounts")
 }
 
+// NextAuth Session model for database sessions
+model AuthSession {
+  id                    String    @id @default(cuid())
+  sessionToken          String    @unique
+  userId                String
+  expires               DateTime
+  
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+// Optional: For email verification tokens
+model VerificationToken {
+  identifier            String
+  token                 String    @unique
+  expires               DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
 // ==================== USER MODELS ====================
 
 model User {
@@ -50,6 +73,7 @@ model User {
 
   // Auth Relations
   accounts              Account[]
+  authSessions          AuthSession[]
 
   // Relations
   skillsOffered         Skill[]                    @relation("SkillOwner")
