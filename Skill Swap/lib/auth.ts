@@ -154,6 +154,19 @@ const fullAuthConfig: NextAuthConfig = {
   trustHost: true,
   // Disable debug to prevent sensitive data logging
   debug: false,
+  // Disable logging to prevent access tokens from being printed
+  logger: {
+    error: (code, ...message) => {
+      // Only log the error code, not the full message which may contain tokens
+      console.error(`[Auth Error] ${code}`);
+    },
+    warn: (code) => {
+      console.warn(`[Auth Warning] ${code}`);
+    },
+    debug: () => {
+      // Suppress debug logs entirely
+    },
+  },
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(fullAuthConfig);
