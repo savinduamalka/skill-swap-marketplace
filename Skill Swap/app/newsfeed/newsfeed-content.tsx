@@ -13,7 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Heart,
   MessageCircle,
-  MoreHorizontal,
   Image as ImageIcon,
   Video,
   Loader2,
@@ -25,6 +24,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { PostComments } from '@/components/post-comments';
 import { PostShare } from '@/components/post-share';
+import { PostActionsMenu } from '@/components/post-actions-menu';
+import { EditPostDialog } from '@/components/edit-post-dialog';
+import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { NewsfeedPost } from './page';
 
@@ -60,6 +62,21 @@ export function NewsfeedContent({
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit post state
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editingPost, setEditingPost] = useState<NewsfeedPost | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    postId: string | null;
+    isLoading: boolean;
+  }>({ isOpen: false, postId: null, isLoading: false });
+
+  // Saved posts tracking
+  const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
 
   /**
    * Fetch more posts for infinite scroll
@@ -292,6 +309,74 @@ export function NewsfeedContent({
   };
 
   /**
+   * Handle edit post
+   */
+  const handleEditPost = (post: NewsfeedPost) => {
+    setEditingPost(post);
+    setEditingPostId(post.id);
+    setShowEditDialog(true);
+  };
+
+  /**
+   * Handle post update
+   */
+  const handlePostUpdated = (updatedPost: NewsfeedPost) => {
+    setPosts((prev) =>
+      prev.map((post) => (post.id === updatedPost.id ? updatedPost : post))
+    );
+    setShowEditDialog(false);
+  };
+
+  /**
+   * Handle delete post
+   */
+  const handleDeletePost = (postId: string) => {
+    setDeleteConfirm({ isOpen: true, postId, isLoading: false });
+  };
+
+  /**
+   * Confirm delete post
+   */
+  const confirmDeletePost = async () => {
+    if (!deleteConfirm.postId) return;
+
+    setDeleteConfirm((prev) => ({ ...prev, isLoading: true }));
+
+    try {
+      const response = await fetch(
+        `/api/newsfeed/${deleteConfirm.postId}/edit`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to delete post');
+
+      setPosts((prev) => prev.filter((p) => p.id !== deleteConfirm.postId));
+      setDeleteConfirm({ isOpen: false, postId: null, isLoading: false });
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      alert('Failed to delete post');
+      setDeleteConfirm({ isOpen: false, postId: null, isLoading: false });
+    }
+  };
+
+  /**
+   * Handle save toggle
+   */
+  const handleSaveToggle = (postId: string, isSaved: boolean) => {
+    if (isSaved) {
+      setSavedPostIds((prev) => new Set([...prev, postId]));
+    } else {
+      setSavedPostIds((prev) => {
+        const updated = new Set(prev);
+        updated.delete(postId);
+        return updated;
+      });
+    }
+  };
+
+  /**
    * Get user initials for avatar fallback
    */
   const getUserInitials = (name: string) => {
@@ -508,9 +593,16 @@ export function NewsfeedContent({
                       </p>
                     </div>
                   </Link>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  <PostActionsMenu
+                    postId={post.id}
+                    isAuthor={post.author.id === currentUserId}
+                    isSaved={savedPostIds.has(post.id)}
+                    onEdit={() => handleEditPost(post)}
+                    onDelete={() => handleDeletePost(post.id)}
+                    onSaveToggle={(isSaved) =>
+                      handleSaveToggle(post.id, isSaved)
+                    }
+                  />
                 </div>
 
                 {/* Skills Tags */}
@@ -642,6 +734,30 @@ export function NewsfeedContent({
           </p>
         )}
       </div>
+
+      {/* Edit Post Dialog */}
+      {editingPost && (
+        <EditPostDialog
+          isOpen={showEditDialog}
+          postId={editingPost.id}
+          initialTitle={editingPost.title}
+          initialContent={editingPost.content}
+          initialHashtags={editingPost.hashtags}
+          initialMediaUrl={editingPost.mediaUrl || undefined}
+          onOpenChange={setShowEditDialog}
+          onSave={handlePostUpdated}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDeleteDialog
+        isOpen={deleteConfirm.isOpen}
+        isLoading={deleteConfirm.isLoading}
+        onConfirm={confirmDeletePost}
+        onCancel={() =>
+          setDeleteConfirm({ isOpen: false, postId: null, isLoading: false })
+        }
+      />
     </div>
   );
 }

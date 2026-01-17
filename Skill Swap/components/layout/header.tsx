@@ -29,7 +29,8 @@ import { useWallet } from '@/contexts/wallet-context';
 const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/search', label: 'Search Skills' },
-  { href: '/browse-posts', label: 'Browse Posts' },
+  { href: '/newsfeed', label: 'Newsfeed' },
+  { href: '/saved-posts', label: 'Saved Posts' },
   { href: '/connections', label: 'Connections' },
 ] as const;
 

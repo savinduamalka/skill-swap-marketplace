@@ -21,6 +21,7 @@ import {
 import { ConnectButton } from '@/components/connect-button';
 import { BackButton } from '@/components/back-button';
 import { BlockUserButton } from '@/components/block-user-button';
+import { ProfilePostsSection } from './profile-posts-section';
 
 // Force dynamic rendering to always get fresh connection status
 export const dynamic = 'force-dynamic';
@@ -568,6 +569,12 @@ export default async function UserProfilePage({
               </p>
             )}
           </Card>
+
+          {/* Posts Section */}
+          <ProfilePostsSection
+            userId={userId}
+            currentUserId={session.user.id}
+          />
 
           {/* Reviews Section */}
           <Card className="p-6">
