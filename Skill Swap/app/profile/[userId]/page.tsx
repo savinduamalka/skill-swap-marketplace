@@ -68,6 +68,57 @@ interface UserProfile {
 }
 
 /**
+ * Get active connection count excluding blocked users
+ * This counts only ACTIVE connections where neither party has blocked the other
+ */
+async function getActiveConnectionCount(
+  userId: string,
+  viewerId: string
+): Promise<number> {
+  try {
+    // Get all blocked user IDs for the profile user
+    const [blockedByProfile, blockedProfile] = await Promise.all([
+      prisma.blockedUser.findMany({
+        where: { blockerId: userId },
+        select: { blockedId: true },
+      }),
+      prisma.blockedUser.findMany({
+        where: { blockedId: userId },
+        select: { blockerId: true },
+      }),
+    ]);
+
+    const blockedUserIds = new Set([
+      ...blockedByProfile.map((b) => b.blockedId),
+      ...blockedProfile.map((b) => b.blockerId),
+    ]);
+
+    // Count active connections excluding blocked users
+    const activeConnections = await prisma.connection.count({
+      where: {
+        OR: [
+          {
+            user1Id: userId,
+            status: 'ACTIVE',
+            user2Id: { notIn: Array.from(blockedUserIds) },
+          },
+          {
+            user2Id: userId,
+            status: 'ACTIVE',
+            user1Id: { notIn: Array.from(blockedUserIds) },
+          },
+        ],
+      },
+    });
+
+    return activeConnections;
+  } catch (error) {
+    console.error('Error getting active connection count:', error);
+    return 0;
+  }
+}
+
+/**
  * Fetch user profile data with related information
  */
 async function getUserProfile(userId: string): Promise<UserProfile | null> {
@@ -328,10 +379,12 @@ export default async function UserProfilePage({
     notFound();
   }
 
-  const [connectionStatus, blockStatus] = await Promise.all([
-    checkConnectionStatus(session.user.id, userId),
-    checkBlockStatus(session.user.id, userId),
-  ]);
+  const [connectionStatus, blockStatus, activeConnectionCount] =
+    await Promise.all([
+      checkConnectionStatus(session.user.id, userId),
+      checkBlockStatus(session.user.id, userId),
+      getActiveConnectionCount(userId, session.user.id),
+    ]);
 
   const { isConnected, hasPendingRequest, isSentByCurrentUser } =
     connectionStatus;
@@ -364,8 +417,7 @@ export default async function UserProfilePage({
   }
 
   const averageRating = calculateAverageRating(profile.reviewsReceived);
-  const totalConnections =
-    profile._count.connections + profile._count.connectedTo;
+  const totalConnections = activeConnectionCount;
   const displayName = profile.fullName || profile.name || 'User';
 
   return (

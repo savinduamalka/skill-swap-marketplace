@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Ban, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useWallet } from '@/contexts/wallet-context';
 
 interface BlockUserButtonProps {
   userId: string;
@@ -42,6 +43,7 @@ export function BlockUserButton({
   isBlocked = false,
 }: BlockUserButtonProps) {
   const router = useRouter();
+  const { refreshWallet } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [blocked, setBlocked] = useState(isBlocked);
@@ -65,6 +67,9 @@ export function BlockUserButton({
       toast.success('User blocked', {
         description: `${userName} has been blocked. They can no longer view your profile or contact you.`,
       });
+
+      // Refresh wallet (blocking may refund pending request credits)
+      refreshWallet();
 
       router.refresh();
     } catch (error) {

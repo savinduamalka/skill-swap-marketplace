@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { Users, Loader2, MessageSquare, Clock, X, Wallet } from 'lucide-react';
+import { useWallet } from '@/contexts/wallet-context';
 
 interface ConnectButtonProps {
   receiverId: string;
@@ -34,6 +35,7 @@ export function ConnectButton({
   isSentByCurrentUser = false,
 }: ConnectButtonProps) {
   const router = useRouter();
+  const { refreshWallet } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [status, setStatus] = useState<'idle' | 'pending' | 'connected'>(
@@ -99,6 +101,9 @@ export function ConnectButton({
         description: `${receiverName} will be notified. 5 credits have been held from your wallet.`,
       });
 
+      // Refresh wallet balance immediately
+      refreshWallet();
+
       // Refresh the page to update any server-side data
       router.refresh();
     } catch (error) {
@@ -139,6 +144,9 @@ export function ConnectButton({
       toast.success('Connection request cancelled', {
         description: `${data.creditsRefunded} credits have been refunded to your wallet.`,
       });
+
+      // Refresh wallet balance immediately
+      refreshWallet();
 
       // Refresh the page to update any server-side data
       router.refresh();

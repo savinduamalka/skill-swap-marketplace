@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Check, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useWallet } from '@/contexts/wallet-context';
 
 interface ConnectionRequestActionsProps {
   requestId: string;
@@ -28,6 +29,7 @@ export function ConnectionRequestActions({
   creditsHeld,
 }: ConnectionRequestActionsProps) {
   const router = useRouter();
+  const { refreshWallet } = useWallet();
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDeclining, setIsDeclining] = useState(false);
   const [showAcceptDialog, setShowAcceptDialog] = useState(false);
@@ -51,6 +53,9 @@ export function ConnectionRequestActions({
       toast.success('Connection accepted!', {
         description: `You are now connected with ${senderName}. +${creditsHeld} credits received!`,
       });
+
+      // Refresh wallet balance immediately (credits received)
+      refreshWallet();
 
       router.refresh();
     } catch (error) {
