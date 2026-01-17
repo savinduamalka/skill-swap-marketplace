@@ -74,7 +74,7 @@ const fullAuthConfig: NextAuthConfig = {
   },
   events: {
     /**
-     * Create wallet for new users
+     * Create wallet for new users and mark OAuth users as verified
      */
     async createUser({ user }) {
       if (user.id) {
@@ -88,8 +88,18 @@ const fullAuthConfig: NextAuthConfig = {
               incomingBalance: 0,
             },
           });
+
+          // Mark user as verified if they signed up via OAuth
+          // OAuth providers (Google, Facebook) have already verified the email
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              emailVerified: new Date(),
+              isVerified: true,
+            },
+          });
         } catch (error) {
-          console.error('Error creating wallet:', error);
+          console.error('Error in createUser event:', error);
         }
       }
     },
