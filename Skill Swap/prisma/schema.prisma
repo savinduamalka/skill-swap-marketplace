@@ -54,6 +54,23 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+// ==================== SEARCH HISTORY MODEL ====================
+
+model SearchHistory {
+  id                    String    @id @default(cuid())
+  userId                String
+  query                 String    // The search keyword/query
+  searchedAt            DateTime  @default(now())
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, query]) // Prevent duplicate queries per user
+  @@index([userId])
+  @@index([searchedAt])
+  @@map("search_history")
+}
+
 // ==================== USER MODELS ====================
 
 model User {
@@ -95,6 +112,7 @@ model User {
   postLikes             PostLike[]
   postComments          PostComment[]             @relation("Commenter")
   notifications         Notification[]
+  searchHistory         SearchHistory[]
 
   @@index([email])
   @@map("users")
