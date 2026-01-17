@@ -28,6 +28,8 @@ async function getUserSettings(userId: string) {
           proficiencyLevel: true,
           yearsOfExperience: true,
           teachingFormat: true,
+          availabilityWindow: true,
+          alternativeNames: true,
         },
         orderBy: {
           createdAt: 'desc',

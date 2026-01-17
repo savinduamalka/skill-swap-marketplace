@@ -92,6 +92,8 @@ interface SkillOffered {
   proficiencyLevel: string;
   yearsOfExperience: number;
   teachingFormat: string;
+  availabilityWindow: string;
+  alternativeNames: string | null;
 }
 
 interface SkillWanted {
@@ -180,6 +182,9 @@ export function SettingsContent({ user }: SettingsContentProps) {
   const [skillProficiency, setSkillProficiency] = useState('');
   const [skillYears, setSkillYears] = useState('');
   const [skillFormat, setSkillFormat] = useState('');
+  const [skillAvailabilityStart, setSkillAvailabilityStart] = useState('09:00');
+  const [skillAvailabilityEnd, setSkillAvailabilityEnd] = useState('17:00');
+  const [skillAlternativeNames, setSkillAlternativeNames] = useState('');
   const [isSavingSkill, setIsSavingSkill] = useState(false);
 
   // Skills I Want to Learn modal state
@@ -327,6 +332,9 @@ export function SettingsContent({ user }: SettingsContentProps) {
     setSkillProficiency('');
     setSkillYears('');
     setSkillFormat('');
+    setSkillAvailabilityStart('09:00');
+    setSkillAvailabilityEnd('17:00');
+    setSkillAlternativeNames('');
     setEditingSkill(null);
   };
 
@@ -351,6 +359,12 @@ export function SettingsContent({ user }: SettingsContentProps) {
       return;
     }
 
+    // Validate availability window
+    if (skillAvailabilityStart >= skillAvailabilityEnd) {
+      toast.error('End time must be after start time');
+      return;
+    }
+
     setIsSavingSkill(true);
 
     try {
@@ -363,7 +377,9 @@ export function SettingsContent({ user }: SettingsContentProps) {
           proficiencyLevel: skillProficiency,
           yearsOfExperience: parseInt(skillYears),
           teachingFormat: skillFormat,
+          availabilityWindow: `${skillAvailabilityStart}-${skillAvailabilityEnd}`,
           timeZone: user.timeZone || 'UTC',
+          alternativeNames: skillAlternativeNames.trim() || null,
         }),
       });
 
@@ -400,6 +416,12 @@ export function SettingsContent({ user }: SettingsContentProps) {
       return;
     }
 
+    // Validate availability window
+    if (skillAvailabilityStart >= skillAvailabilityEnd) {
+      toast.error('End time must be after start time');
+      return;
+    }
+
     setIsSavingSkill(true);
 
     try {
@@ -413,6 +435,8 @@ export function SettingsContent({ user }: SettingsContentProps) {
           proficiencyLevel: skillProficiency,
           yearsOfExperience: parseInt(skillYears),
           teachingFormat: skillFormat,
+          availabilityWindow: `${skillAvailabilityStart}-${skillAvailabilityEnd}`,
+          alternativeNames: skillAlternativeNames.trim() || null,
         }),
       });
 
@@ -465,6 +489,14 @@ export function SettingsContent({ user }: SettingsContentProps) {
     setSkillProficiency(skill.proficiencyLevel);
     setSkillYears(skill.yearsOfExperience.toString());
     setSkillFormat(skill.teachingFormat);
+    // Parse availability window (format: "09:00-17:00")
+    const [start, end] = skill.availabilityWindow?.split('-') || [
+      '09:00',
+      '17:00',
+    ];
+    setSkillAvailabilityStart(start || '09:00');
+    setSkillAvailabilityEnd(end || '17:00');
+    setSkillAlternativeNames(skill.alternativeNames || '');
     setIsEditSkillOpen(true);
   };
 
@@ -918,7 +950,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
                     className="flex items-center justify-between p-4 rounded-lg border bg-card"
                   >
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-medium">{skill.name}</h4>
                         <Badge variant="outline" className="capitalize">
                           {skill.proficiencyLevel.toLowerCase()}
@@ -929,7 +961,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
                           {skill.description}
                         </p>
                       )}
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                         {skill.yearsOfExperience && (
                           <span>
                             {skill.yearsOfExperience} years experience
@@ -940,7 +972,29 @@ export function SettingsContent({ user }: SettingsContentProps) {
                             {skill.teachingFormat}
                           </span>
                         )}
+                        {skill.availabilityWindow && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {skill.availabilityWindow}
+                          </span>
+                        )}
                       </div>
+                      {skill.alternativeNames && (
+                        <div className="flex items-center gap-1 flex-wrap mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            Also known as:
+                          </span>
+                          {skill.alternativeNames.split(',').map((alt, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="secondary"
+                              className="text-xs py-0"
+                            >
+                              {alt.trim()}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -1089,7 +1143,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
 
         {/* Add Skill Modal */}
         <Dialog open={isAddSkillOpen} onOpenChange={setIsAddSkillOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Skill</DialogTitle>
               <DialogDescription>
@@ -1162,6 +1216,61 @@ export function SettingsContent({ user }: SettingsContentProps) {
                   </SelectContent>
                 </Select>
               </div>
+              {/* Availability Window */}
+              <div className="space-y-2">
+                <Label>Availability Window *</Label>
+                <p className="text-xs text-muted-foreground">
+                  Set your preferred teaching hours (in your local time zone)
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="add-skill-availability-start"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Start Time
+                    </Label>
+                    <Input
+                      id="add-skill-availability-start"
+                      type="time"
+                      value={skillAvailabilityStart}
+                      onChange={(e) =>
+                        setSkillAvailabilityStart(e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="add-skill-availability-end"
+                      className="text-xs text-muted-foreground"
+                    >
+                      End Time
+                    </Label>
+                    <Input
+                      id="add-skill-availability-end"
+                      type="time"
+                      value={skillAvailabilityEnd}
+                      onChange={(e) => setSkillAvailabilityEnd(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+              {/* Alternative Names */}
+              <div className="space-y-2">
+                <Label htmlFor="add-skill-alternative-names">
+                  Alternative Names (Optional)
+                </Label>
+                <Input
+                  id="add-skill-alternative-names"
+                  placeholder="e.g., JS, ECMAScript, ES6 (comma-separated)"
+                  value={skillAlternativeNames}
+                  onChange={(e) => setSkillAlternativeNames(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Add alternative names or abbreviations that people might use
+                  to search for this skill. Separate multiple names with commas.
+                </p>
+              </div>
             </div>
             <DialogFooter>
               <Button
@@ -1186,7 +1295,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
 
         {/* Edit Skill Modal */}
         <Dialog open={isEditSkillOpen} onOpenChange={setIsEditSkillOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Skill</DialogTitle>
               <DialogDescription>
@@ -1260,6 +1369,61 @@ export function SettingsContent({ user }: SettingsContentProps) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              {/* Availability Window */}
+              <div className="space-y-2">
+                <Label>Availability Window *</Label>
+                <p className="text-xs text-muted-foreground">
+                  Set your preferred teaching hours (in your local time zone)
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="edit-skill-availability-start"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Start Time
+                    </Label>
+                    <Input
+                      id="edit-skill-availability-start"
+                      type="time"
+                      value={skillAvailabilityStart}
+                      onChange={(e) =>
+                        setSkillAvailabilityStart(e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="edit-skill-availability-end"
+                      className="text-xs text-muted-foreground"
+                    >
+                      End Time
+                    </Label>
+                    <Input
+                      id="edit-skill-availability-end"
+                      type="time"
+                      value={skillAvailabilityEnd}
+                      onChange={(e) => setSkillAvailabilityEnd(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+              {/* Alternative Names */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-skill-alternative-names">
+                  Alternative Names (Optional)
+                </Label>
+                <Input
+                  id="edit-skill-alternative-names"
+                  placeholder="e.g., JS, ECMAScript, ES6 (comma-separated)"
+                  value={skillAlternativeNames}
+                  onChange={(e) => setSkillAlternativeNames(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Add alternative names or abbreviations that people might use
+                  to search for this skill. Separate multiple names with commas.
+                </p>
               </div>
             </div>
             <DialogFooter>

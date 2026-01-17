@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
       teachingFormat,
       availabilityWindow,
       timeZone,
+      alternativeNames,
     } = body;
 
     // Validate required fields
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
         teachingFormat,
         availabilityWindow: availabilityWindow || '09:00-17:00',
         timeZone: timeZone || 'UTC',
+        alternativeNames: alternativeNames?.trim() || null,
       },
     });
 
@@ -143,6 +145,7 @@ export async function PUT(request: NextRequest) {
       teachingFormat,
       availabilityWindow,
       timeZone,
+      alternativeNames,
     } = body;
 
     if (!id) {
@@ -176,6 +179,10 @@ export async function PUT(request: NextRequest) {
         availabilityWindow:
           availabilityWindow || existingSkill.availabilityWindow,
         timeZone: timeZone || existingSkill.timeZone,
+        alternativeNames:
+          alternativeNames !== undefined
+            ? alternativeNames?.trim() || null
+            : existingSkill.alternativeNames,
       },
     });
 

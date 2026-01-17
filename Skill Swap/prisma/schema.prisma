@@ -112,6 +112,7 @@ model Skill {
   teachingFormat        String    // "Online" | "In-Person" | "Hybrid"
   availabilityWindow    String    // "06:00-10:00" format
   timeZone              String
+  alternativeNames      String?   // Comma-separated alternative names for search (e.g., "JS,ECMAScript,ES6")
   isMandatory           Boolean   @default(true) // At least one skill is mandatory
   isTeaching            Boolean   @default(true)
   createdAt             DateTime  @default(now())
