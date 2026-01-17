@@ -1,0 +1,647 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { formatDistanceToNow } from 'date-fns';
+import { useSession } from 'next-auth/react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Heart,
+  MessageCircle,
+  MoreHorizontal,
+  Image as ImageIcon,
+  Video,
+  Loader2,
+  Send,
+  X,
+  RefreshCw,
+} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { PostComments } from '@/components/post-comments';
+import { PostShare } from '@/components/post-share';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import type { NewsfeedPost } from './page';
+
+interface NewsfeedContentProps {
+  initialPosts: NewsfeedPost[];
+  initialCursor: string | null;
+  initialHasMore: boolean;
+  currentUserId: string;
+}
+
+export function NewsfeedContent({
+  initialPosts,
+  initialCursor,
+  initialHasMore,
+  currentUserId,
+}: NewsfeedContentProps) {
+  const { data: session } = useSession();
+  const [posts, setPosts] = useState<NewsfeedPost[]>(initialPosts);
+  const [cursor, setCursor] = useState<string | null>(initialCursor);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCreatingPost, setIsCreatingPost] = useState(false);
+  const [newPostsCount, setNewPostsCount] = useState(0);
+  const [showNewPostsAlert, setShowNewPostsAlert] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Post creation state
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [postTitle, setPostTitle] = useState('');
+  const [postContent, setPostContent] = useState('');
+  const [postHashtags, setPostHashtags] = useState('');
+  const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Fetch more posts for infinite scroll
+   */
+  const fetchMorePosts = useCallback(async () => {
+    if (isLoading || !hasMore || !cursor) return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/newsfeed?cursor=${cursor}&limit=12`);
+      if (!response.ok) throw new Error('Failed to fetch posts');
+
+      const data = await response.json();
+      setPosts((prev) => [...prev, ...data.posts]);
+      setCursor(data.nextCursor);
+      setHasMore(data.hasMore);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cursor, hasMore, isLoading]);
+
+  /**
+   * Set up Intersection Observer for infinite scroll
+   */
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoading) {
+          fetchMorePosts();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [fetchMorePosts, hasMore, isLoading]);
+
+  /**
+   * Auto-refresh for new posts (polling every 30 seconds)
+   */
+  useEffect(() => {
+    const checkForNewPosts = async () => {
+      try {
+        // Fetch posts from the beginning
+        const response = await fetch('/api/newsfeed?limit=12');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const newPosts = data.posts;
+
+        // Check if there are new posts at the top
+        if (newPosts.length > 0 && posts.length > 0) {
+          const latestFeedPostId = posts[0].id;
+          const latestApiPostId = newPosts[0].id;
+
+          if (latestApiPostId !== latestFeedPostId) {
+            // Count new posts
+            const newCount = newPosts.findIndex(
+              (p: NewsfeedPost) => p.id === latestFeedPostId
+            );
+            if (newCount > 0) {
+              setNewPostsCount(newCount);
+              setShowNewPostsAlert(true);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for new posts:', error);
+      }
+    };
+
+    // Set up interval to check for new posts every 30 seconds
+    autoRefreshIntervalRef.current = setInterval(checkForNewPosts, 30000);
+
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
+  }, [posts]);
+
+  /**
+   * Load new posts from the top
+   */
+  const handleLoadNewPosts = async () => {
+    try {
+      const response = await fetch('/api/newsfeed?limit=12');
+      if (!response.ok) throw new Error('Failed to fetch posts');
+
+      const data = await response.json();
+      setPosts(data.posts);
+      setCursor(data.nextCursor);
+      setHasMore(data.hasMore);
+      setNewPostsCount(0);
+      setShowNewPostsAlert(false);
+    } catch (error) {
+      console.error('Error loading new posts:', error);
+    }
+  };
+
+  /**
+   * Handle media file selection
+   */
+  const handleMediaSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'video/mp4',
+      'video/webm',
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Invalid file type. Please select an image or video.');
+      return;
+    }
+
+    // Validate file size
+    const maxSize = file.type.startsWith('video/')
+      ? 50 * 1024 * 1024
+      : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert(
+        `File too large. Maximum size: ${file.type.startsWith('video/') ? '50MB' : '10MB'}`
+      );
+      return;
+    }
+
+    setSelectedMedia(file);
+    setMediaPreview(URL.createObjectURL(file));
+  };
+
+  /**
+   * Remove selected media
+   */
+  const removeMedia = () => {
+    setSelectedMedia(null);
+    if (mediaPreview) {
+      URL.revokeObjectURL(mediaPreview);
+      setMediaPreview(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  /**
+   * Create a new post
+   */
+  const handleCreatePost = async () => {
+    if (!postTitle.trim() || !postContent.trim()) {
+      alert('Please enter a title and content for your post.');
+      return;
+    }
+
+    setIsCreatingPost(true);
+    try {
+      const formData = new FormData();
+      formData.append('title', postTitle.trim());
+      formData.append('content', postContent.trim());
+      if (postHashtags.trim()) {
+        formData.append('hashtags', postHashtags.trim());
+      }
+      if (selectedMedia) {
+        formData.append('media', selectedMedia);
+      }
+
+      const response = await fetch('/api/newsfeed', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create post');
+      }
+
+      const data = await response.json();
+
+      // Add new post to the top of the feed
+      setPosts((prev) => [data.post, ...prev]);
+
+      // Reset form
+      setPostTitle('');
+      setPostContent('');
+      setPostHashtags('');
+      removeMedia();
+      setShowCreatePost(false);
+    } catch (error) {
+      console.error('Error creating post:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create post');
+    } finally {
+      setIsCreatingPost(false);
+    }
+  };
+
+  /**
+   * Toggle like on a post
+   */
+  const handleLike = async (postId: string) => {
+    try {
+      const response = await fetch(`/api/newsfeed/${postId}/like`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) throw new Error('Failed to toggle like');
+
+      const data = await response.json();
+
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? { ...post, isLiked: data.isLiked, likesCount: data.likesCount }
+            : post
+        )
+      );
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    }
+  };
+
+  /**
+   * Get user initials for avatar fallback
+   */
+  const getUserInitials = (name: string) => {
+    const names = name.split(' ');
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return name[0]?.toUpperCase() || 'U';
+  };
+
+  /**
+   * Format post date
+   */
+  const formatDate = (date: Date | string) => {
+    return formatDistanceToNow(new Date(date), { addSuffix: true });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* New Posts Alert */}
+      {showNewPostsAlert && (
+        <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+          <RefreshCw className="h-4 w-4" />
+          <AlertDescription className="ml-2 flex items-center justify-between">
+            <span>
+              {newPostsCount} new post{newPostsCount !== 1 ? 's' : ''} available
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleLoadNewPosts}
+              className="ml-4"
+            >
+              Load New Posts
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Create Post Card */}
+      <Card className="p-4">
+        {!showCreatePost ? (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={session?.user?.image || ''} alt="Your avatar" />
+              <AvatarFallback>
+                {getUserInitials(session?.user?.name || 'User')}
+              </AvatarFallback>
+            </Avatar>
+            <button
+              onClick={() => setShowCreatePost(true)}
+              className="flex-1 text-left px-4 py-2.5 bg-muted/50 hover:bg-muted rounded-full text-muted-foreground transition"
+            >
+              Share your skills or what you&apos;re learning...
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Create Post</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setShowCreatePost(false);
+                  setPostTitle('');
+                  setPostContent('');
+                  setPostHashtags('');
+                  removeMedia();
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <Input
+              placeholder="Post title"
+              value={postTitle}
+              onChange={(e) => setPostTitle(e.target.value)}
+              maxLength={200}
+            />
+
+            <Textarea
+              placeholder="What's on your mind? Share your skills, learning journey, or ask for help..."
+              value={postContent}
+              onChange={(e) => setPostContent(e.target.value)}
+              rows={4}
+              maxLength={5000}
+            />
+
+            <Input
+              placeholder="Hashtags (comma-separated): react, javascript, webdev"
+              value={postHashtags}
+              onChange={(e) => setPostHashtags(e.target.value)}
+            />
+
+            {/* Media Preview */}
+            {mediaPreview && (
+              <div className="relative">
+                {selectedMedia?.type.startsWith('video/') ? (
+                  <video
+                    src={mediaPreview}
+                    className="w-full max-h-64 object-cover rounded-lg"
+                    controls
+                  />
+                ) : (
+                  <div className="relative w-full h-64">
+                    <Image
+                      src={mediaPreview}
+                      alt="Preview"
+                      fill
+                      className="object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2"
+                  onClick={removeMedia}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm"
+                  className="hidden"
+                  onChange={handleMediaSelect}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" />
+                  Photo
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Video className="h-4 w-4 mr-2" />
+                  Video
+                </Button>
+              </div>
+
+              <Button
+                onClick={handleCreatePost}
+                disabled={
+                  isCreatingPost || !postTitle.trim() || !postContent.trim()
+                }
+              >
+                {isCreatingPost ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Posting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Post
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Posts Feed */}
+      {posts.length === 0 && !isLoading ? (
+        <Card className="p-12 text-center">
+          <div className="text-muted-foreground">
+            <p className="text-lg font-medium mb-2">No posts yet</p>
+            <p className="text-sm">
+              Be the first to share something with the community!
+            </p>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {posts.map((post) => (
+            <Card key={post.id} className="overflow-hidden">
+              {/* Post Header */}
+              <div className="p-4 pb-0">
+                <div className="flex items-start justify-between">
+                  <Link
+                    href={`/profile/${post.author.id}`}
+                    className="flex items-center gap-3 hover:opacity-80 transition"
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage
+                        src={post.author.image || ''}
+                        alt={post.author.name}
+                      />
+                      <AvatarFallback>
+                        {getUserInitials(post.author.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {post.author.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(post.createdAt)}
+                      </p>
+                    </div>
+                  </Link>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Skills Tags */}
+                {post.author.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {post.author.skills.map((skill) => (
+                      <Badge
+                        key={skill}
+                        variant="secondary"
+                        className="text-xs"
+                      >
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Post Content */}
+              <div className="px-4 py-3">
+                <h3 className="font-semibold text-lg mb-2">{post.title}</h3>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {post.content}
+                </p>
+
+                {/* Hashtags */}
+                {post.hashtags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-3">
+                    {post.hashtags.map((tag) => (
+                      <span key={tag} className="text-primary text-sm">
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Post Media */}
+              {post.mediaUrl && (
+                <div className="relative w-full aspect-video bg-muted">
+                  {post.mediaUrl.match(/\.(mp4|webm)$/i) ? (
+                    <video
+                      src={post.mediaUrl}
+                      className="w-full h-full object-cover"
+                      controls
+                    />
+                  ) : (
+                    <Image
+                      src={post.mediaUrl}
+                      alt={post.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 672px"
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Post Stats */}
+              <div className="px-4 py-2 flex items-center justify-between text-sm text-muted-foreground border-t border-b">
+                <span>{post.likesCount} likes</span>
+                <span>{post.commentsCount} comments</span>
+              </div>
+
+              {/* Post Actions */}
+              <div className="px-4 py-2 flex items-center justify-between gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`flex-1 ${post.isLiked ? 'text-red-500' : ''}`}
+                  onClick={() => handleLike(post.id)}
+                >
+                  <Heart
+                    className={`h-4 w-4 mr-2 ${post.isLiked ? 'fill-current' : ''}`}
+                  />
+                  <span className="text-xs">Like</span>
+                </Button>
+                <Button variant="ghost" size="sm" className="flex-1">
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  <span className="text-xs">Comment</span>
+                </Button>
+                <PostShare postId={post.id} />
+              </div>
+
+              {/* Comments Section */}
+              <div className="px-4 pb-4">
+                <PostComments
+                  postId={post.id}
+                  initialCommentCount={post.commentsCount}
+                  onCommentAdded={() => {
+                    setPosts((prev) =>
+                      prev.map((p) =>
+                        p.id === post.id
+                          ? { ...p, commentsCount: p.commentsCount + 1 }
+                          : p
+                      )
+                    );
+                  }}
+                />
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Infinite Scroll Trigger */}
+      <div ref={loadMoreRef} className="py-4">
+        {isLoading && (
+          <div className="space-y-4">
+            {[1, 2].map((i) => (
+              <Card key={i} className="p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <Skeleton className="h-5 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-full mb-1" />
+                <Skeleton className="h-4 w-5/6" />
+              </Card>
+            ))}
+          </div>
+        )}
+        {!hasMore && posts.length > 0 && (
+          <p className="text-center text-muted-foreground text-sm">
+            You&apos;ve reached the end of the feed
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
