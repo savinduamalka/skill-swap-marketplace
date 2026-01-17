@@ -111,6 +111,7 @@ model User {
   newsfeedPosts         NewsfeedPost[]            @relation("Author")
   postLikes             PostLike[]
   postComments          PostComment[]             @relation("Commenter")
+  savedPosts            SavedPost[]
   notifications         Notification[]
   searchHistory         SearchHistory[]
   blockedUsers          BlockedUser[]             @relation("Blocker")
@@ -430,6 +431,7 @@ model NewsfeedPost {
   author                User      @relation("Author", fields: [authorId], references: [id], onDelete: Cascade)
   likes                 PostLike[]
   comments              PostComment[]
+  savedBy               SavedPost[]
 
   @@index([authorId])
   @@index([createdAt])
@@ -467,6 +469,22 @@ model PostComment {
   @@index([postId])
   @@index([commenterId])
   @@map("post_comments")
+}
+
+model SavedPost {
+  id                    String    @id @default(cuid())
+  postId                String
+  userId                String
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  post                  NewsfeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@map("saved_posts")
 }
 
 // ==================== NOTIFICATION MODELS ====================
