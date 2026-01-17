@@ -41,7 +41,6 @@ model User {
   name                  String?
   image                 String?
   passwordHash          String?
-  avatarUrl             String?
   bio                   String?
   timeZone              String    @default("UTC")
   isAdmin               Boolean   @default(false)
