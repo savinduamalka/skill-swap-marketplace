@@ -15,11 +15,14 @@ import {
   Calendar,
   Clock,
   Users,
-  MessageSquare,
   CheckCircle2,
   BookOpen,
   ArrowLeft,
 } from 'lucide-react';
+import { ConnectButton } from '@/components/connect-button';
+
+// Force dynamic rendering to always get fresh connection status
+export const dynamic = 'force-dynamic';
 
 // Types for the profile data
 interface UserProfile {
@@ -153,7 +156,11 @@ async function getUserProfile(userId: string): Promise<UserProfile | null> {
 async function checkConnectionStatus(
   currentUserId: string,
   profileUserId: string
-): Promise<{ isConnected: boolean; hasPendingRequest: boolean }> {
+): Promise<{
+  isConnected: boolean;
+  hasPendingRequest: boolean;
+  isSentByCurrentUser: boolean;
+}> {
   try {
     // Check for active connection
     const connection = await prisma.connection.findFirst({
@@ -181,15 +188,23 @@ async function checkConnectionStatus(
           },
         ],
       },
+      select: {
+        senderId: true,
+      },
     });
 
     return {
       isConnected: !!connection,
       hasPendingRequest: !!pendingRequest,
+      isSentByCurrentUser: pendingRequest?.senderId === currentUserId,
     };
   } catch (error) {
     console.error('Error checking connection status:', error);
-    return { isConnected: false, hasPendingRequest: false };
+    return {
+      isConnected: false,
+      hasPendingRequest: false,
+      isSentByCurrentUser: false,
+    };
   }
 }
 
@@ -267,10 +282,8 @@ export default async function UserProfilePage({
     notFound();
   }
 
-  const { isConnected, hasPendingRequest } = await checkConnectionStatus(
-    session.user.id,
-    userId
-  );
+  const { isConnected, hasPendingRequest, isSentByCurrentUser } =
+    await checkConnectionStatus(session.user.id, userId);
 
   const averageRating = calculateAverageRating(profile.reviewsReceived);
   const totalConnections =
@@ -356,21 +369,13 @@ export default async function UserProfilePage({
 
                   {/* Action Buttons */}
                   <div className="flex gap-2">
-                    {isConnected ? (
-                      <Button>
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Message
-                      </Button>
-                    ) : hasPendingRequest ? (
-                      <Button variant="secondary" disabled>
-                        Request Pending
-                      </Button>
-                    ) : (
-                      <Button>
-                        <Users className="h-4 w-4 mr-2" />
-                        Connect
-                      </Button>
-                    )}
+                    <ConnectButton
+                      receiverId={profile.id}
+                      receiverName={displayName}
+                      isConnected={isConnected}
+                      hasPendingRequest={hasPendingRequest}
+                      isSentByCurrentUser={isSentByCurrentUser}
+                    />
                   </div>
                 </div>
 
