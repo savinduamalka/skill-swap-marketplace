@@ -29,6 +29,7 @@ export interface NewsfeedPost {
   likesCount: number;
   commentsCount: number;
   isLiked: boolean;
+  isSaved?: boolean;
 }
 
 /**

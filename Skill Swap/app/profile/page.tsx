@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MessageSquare, Users, Star, Calendar, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { UserPostsSection } from './user-posts-section';
 
 // Profile data type
 interface ProfileData {
@@ -408,6 +409,9 @@ export default function ProfilePage() {
               </Card>
             </div>
           </div>
+
+          {/* Posts Section */}
+          {profile && <UserPostsSection userId={profile.id} />}
         </div>
       </main>
 
