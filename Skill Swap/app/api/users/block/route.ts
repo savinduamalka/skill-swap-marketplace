@@ -82,7 +82,25 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 2. Cancel any pending connection requests between the two users (both directions)
+      // 2. Delete any non-pending (DECLINED/CANCELLED) requests to allow future re-requests after unblock
+      await tx.connectionRequest.deleteMany({
+        where: {
+          OR: [
+            {
+              senderId: blockerId,
+              receiverId: userId,
+              status: { in: ['DECLINED', 'CANCELLED'] },
+            },
+            {
+              senderId: userId,
+              receiverId: blockerId,
+              status: { in: ['DECLINED', 'CANCELLED'] },
+            },
+          ],
+        },
+      });
+
+      // 3. Cancel any pending connection requests between the two users (both directions)
       // First, find and refund any pending requests
       const pendingRequests = await tx.connectionRequest.findMany({
         where: {

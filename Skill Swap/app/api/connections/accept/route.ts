@@ -102,12 +102,13 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 4. Update sender's transaction to COMPLETED
+      // 4. Update sender's transaction to COMPLETED and remove request reference
       if (connectionRequest.transaction) {
         await tx.transaction.update({
           where: { id: connectionRequest.transaction.id },
           data: {
             status: 'COMPLETED',
+            connectionRequestId: null, // Remove reference before deleting request
             note: `Connection accepted - ${creditsToTransfer} credits transferred to receiver`,
           },
         });
@@ -136,6 +137,12 @@ export async function POST(request: NextRequest) {
           user2Id,
           status: 'ACTIVE',
         },
+      });
+
+      // 7. Delete the connection request from database
+      // This keeps the table clean and allows future requests if connection is ended
+      await tx.connectionRequest.delete({
+        where: { id: connectionRequest.id },
       });
 
       return connection;

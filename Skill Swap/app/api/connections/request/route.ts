@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if there's already a pending request (either direction)
-    const existingRequest = await prisma.connectionRequest.findFirst({
+    const existingPendingRequest = await prisma.connectionRequest.findFirst({
       where: {
         OR: [
           { senderId, receiverId, status: 'PENDING' },
@@ -90,10 +90,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (existingRequest) {
+    if (existingPendingRequest) {
       console.log(
         '[Connection Request] Blocked: Pending request exists',
-        existingRequest.id
+        existingPendingRequest.id
       );
       return NextResponse.json(
         {
@@ -103,6 +103,16 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Delete any old non-pending requests (DECLINED, CANCELLED) to allow re-sending
+    // This handles the case where a user was blocked/unblocked or declined and wants to try again
+    await prisma.connectionRequest.deleteMany({
+      where: {
+        senderId,
+        receiverId,
+        status: { in: ['DECLINED', 'CANCELLED'] },
+      },
+    });
 
     // Get sender's wallet
     const senderWallet = await prisma.wallet.findUnique({

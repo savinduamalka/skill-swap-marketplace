@@ -114,6 +114,43 @@ export async function GET() {
       },
     });
 
+    // Get blocked user IDs to exclude from connection count
+    const [blockedByMe, blockedMe] = await Promise.all([
+      prisma.blockedUser.findMany({
+        where: { blockerId: userId },
+        select: { blockedId: true },
+      }),
+      prisma.blockedUser.findMany({
+        where: { blockedId: userId },
+        select: { blockerId: true },
+      }),
+    ]);
+
+    const blockedUserIds = [
+      ...blockedByMe.map((b) => b.blockedId),
+      ...blockedMe.map((b) => b.blockerId),
+    ];
+
+    // Count active connections excluding blocked users
+    const activeConnectionsCount = await prisma.connection.count({
+      where: {
+        OR: [
+          {
+            user1Id: userId,
+            status: 'ACTIVE',
+            user2Id:
+              blockedUserIds.length > 0 ? { notIn: blockedUserIds } : undefined,
+          },
+          {
+            user2Id: userId,
+            status: 'ACTIVE',
+            user1Id:
+              blockedUserIds.length > 0 ? { notIn: blockedUserIds } : undefined,
+          },
+        ],
+      },
+    });
+
     // Format the response
     const profileData = {
       id: user.id,
@@ -129,7 +166,7 @@ export async function GET() {
       rating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
       reviewCount: reviews.length,
       creditsBalance: user.wallet?.availableBalance || 0,
-      connectionsCount: user._count.connections + user._count.connectedTo,
+      connectionsCount: activeConnectionsCount,
       activeSessionsCount: activeSessions,
 
       // Skills
