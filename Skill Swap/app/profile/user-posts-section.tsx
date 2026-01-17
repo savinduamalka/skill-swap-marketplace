@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
@@ -39,9 +39,12 @@ interface UserPostsSectionProps {
 
 export function UserPostsSection({ userId }: UserPostsSectionProps) {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [shouldLoadPosts, setShouldLoadPosts] = useState(false);
+  const sectionRef = useRef<HTMLDivElement | null>(null);
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -51,7 +54,30 @@ export function UserPostsSection({ userId }: UserPostsSectionProps) {
   }>({ isOpen: false, postId: null, isLoading: false });
 
   useEffect(() => {
+    const node = sectionRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          setShouldLoadPosts(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px 0px 200px 0px', threshold: 0.2 }
+    );
+
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!shouldLoadPosts || hasLoadedOnce) return;
+
     const fetchUserPosts = async () => {
+      setIsLoading(true);
       try {
         const response = await fetch(`/api/users/${userId}/posts?limit=10`);
         if (response.ok) {
@@ -62,11 +88,12 @@ export function UserPostsSection({ userId }: UserPostsSectionProps) {
         console.error('Error fetching user posts:', error);
       } finally {
         setIsLoading(false);
+        setHasLoadedOnce(true);
       }
     };
 
     fetchUserPosts();
-  }, [userId]);
+  }, [shouldLoadPosts, hasLoadedOnce, userId]);
 
   const handleEditPost = (post: Post) => {
     setEditingPost(post);
@@ -136,9 +163,20 @@ export function UserPostsSection({ userId }: UserPostsSectionProps) {
     return name[0]?.toUpperCase() || 'U';
   };
 
+  if (!hasLoadedOnce && !isLoading) {
+    return (
+      <Card ref={sectionRef} className="p-6 mb-6 text-center">
+        <h2 className="text-lg font-semibold mb-2">Posts</h2>
+        <p className="text-muted-foreground text-sm">
+          Scroll to this section to load your posts.
+        </p>
+      </Card>
+    );
+  }
+
   if (isLoading) {
     return (
-      <Card className="p-6 mb-6">
+      <Card ref={sectionRef} className="p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Posts</h2>
         <div className="space-y-4">
           {[1, 2].map((i) => (
@@ -153,7 +191,7 @@ export function UserPostsSection({ userId }: UserPostsSectionProps) {
 
   if (posts.length === 0) {
     return (
-      <Card className="p-6 mb-6 text-center">
+      <Card ref={sectionRef} className="p-6 mb-6 text-center">
         <h2 className="text-lg font-semibold mb-2">Posts</h2>
         <p className="text-muted-foreground">
           You haven't published any posts yet. Start sharing your thoughts!
@@ -164,7 +202,7 @@ export function UserPostsSection({ userId }: UserPostsSectionProps) {
 
   return (
     <>
-      <Card className="p-6 mb-6">
+      <Card ref={sectionRef} className="p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">Posts</h2>
         <div className="space-y-4">
           {posts.map((post) => (
