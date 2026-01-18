@@ -1,0 +1,9 @@
+{
+  "monorepos": ["Skill Swap"],
+  "builds": [
+    {
+      "src": "Skill Swap/package.json",
+      "use": "@vercel/next"
+    }
+  ]
+}
