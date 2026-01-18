@@ -23,6 +23,7 @@ import {
   Send,
   Search,
   Phone,
+  Video,
   MoreVertical,
   Wifi,
   WifiOff,
@@ -34,6 +35,7 @@ import { useChatSocket } from '@/hooks/useChatSocket';
 import { useToast } from '@/hooks/use-toast';
 import { useUnreadMessages } from '@/contexts/unread-messages-context';
 import PrebuiltVideoCall from '@/components/livekit-prebuilt-call';
+import AudioCallInterface from '@/components/livekit-audio-call-interface';
 import { LiveKitCallInterface } from '@/components/livekit-call-interface';
 import { useSession } from 'next-auth/react';
 import type {
@@ -513,6 +515,8 @@ export function MessagesClient() {
         connectionId: incomingCallData.connectionId,
       });
 
+      // Preserve the call type (audio or video) from the incoming call
+      setCallType(incomingCallData.callType || 'video');
       setCallState('active');
     } catch (error) {
       console.error('Error answering call:', error);
@@ -829,17 +833,31 @@ export function MessagesClient() {
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  {/* Audio call */}
                   <Button
                     size="icon"
                     variant="ghost"
-                    title="Start call"
-                    onClick={() => handleStartCall('video')}
+                    title="Start audio call"
+                    onClick={() => handleStartCall('audio')}
                     disabled={
                       callState !== 'idle' ||
                       !onlineUsers.has(selectedConversation.otherUser.id)
                     }
                   >
                     <Phone className="w-4 h-4" />
+                  </Button>
+                  {/* Video call */}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Start video call"
+                    onClick={() => handleStartCall('video')}
+                    disabled={
+                      callState !== 'idle' ||
+                      !onlineUsers.has(selectedConversation.otherUser.id)
+                    }
+                  >
+                    <Video className="w-4 h-4" />
                   </Button>
                   <Button size="icon" variant="ghost" title="More options">
                     <MoreVertical className="w-4 h-4" />
@@ -932,8 +950,19 @@ export function MessagesClient() {
         </div>
       </main>
 
-      {/* LiveKit Prebuilt Conference - Active Call */}
-      {callState === 'active' && liveKitToken && (
+      {/* Audio Call Interface - Active Audio Call */}
+      {callState === 'active' && callType === 'audio' && liveKitToken && (
+        <AudioCallInterface
+          token={liveKitToken}
+          serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
+          onClose={handleEndCall}
+          recipientName={selectedConversation?.otherUser.name}
+          recipientImage={selectedConversation?.otherUser.image}
+        />
+      )}
+
+      {/* LiveKit Prebuilt Conference - Active Video Call */}
+      {callState === 'active' && callType === 'video' && liveKitToken && (
         <PrebuiltVideoCall
           token={liveKitToken}
           serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
