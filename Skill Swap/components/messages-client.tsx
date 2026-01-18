@@ -957,7 +957,7 @@ export function MessagesClient() {
           serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
           onClose={handleEndCall}
           recipientName={selectedConversation?.otherUser.name}
-          recipientImage={selectedConversation?.otherUser.image}
+          recipientImage={selectedConversation?.otherUser.image || undefined}
         />
       )}
 
