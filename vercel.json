@@ -1,4 +1,0 @@
-{
-  "buildCommand": "cd skill-swap && pnpm run build",
-  "installCommand": "cd skill-swap && pnpm install"
-}
