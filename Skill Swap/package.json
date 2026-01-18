@@ -5,11 +5,12 @@
   "description": "Peer-to-peer skill exchange platform for community-driven learning",
   "author": "SkillSwap Development Team",
   "scripts": {
-    "build": "next build",
+    "build": "prisma generate && next build",
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
