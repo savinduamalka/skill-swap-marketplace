@@ -88,6 +88,12 @@ model User {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  // Online Status Tracking (like WhatsApp, Facebook)
+  isOnline              Boolean   @default(false)           // Current online status
+  lastSeenAt            DateTime  @default(now())          // Last activity timestamp
+  connectionCount       Int       @default(0)              // Number of active connections
+  lastHeartbeatAt       DateTime  @default(now())          // Last heartbeat received
+
   // Auth Relations
   accounts              Account[]
   authSessions          AuthSession[]
@@ -116,9 +122,29 @@ model User {
   searchHistory         SearchHistory[]
   blockedUsers          BlockedUser[]             @relation("Blocker")
   blockedBy             BlockedUser[]             @relation("Blocked")
+  onlineStatusHistory   UserOnlineStatus[]
 
   @@index([email])
+  @@index([isOnline])
+  @@index([lastSeenAt])
   @@map("users")
+}
+
+// ==================== USER ONLINE STATUS HISTORY ====================
+// Tracks online/offline status changes for analytics and presence verification
+model UserOnlineStatus {
+  id                    String    @id @default(cuid())
+  userId                String
+  isOnline              Boolean
+  timestamp             DateTime  @default(now())
+  deviceInfo            String?   // Browser/device info
+  ipAddress             String?   // User's IP (for security)
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([timestamp])
+  @@map("user_online_status")
 }
 
 // ==================== BLOCKED USER MODEL ====================
