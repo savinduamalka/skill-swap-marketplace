@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Bell, MessageSquare, User, LogOut, Loader2 } from 'lucide-react';
 import { useWallet } from '@/contexts/wallet-context';
+import { useUnreadMessages } from '@/contexts/unread-messages-context';
 
 // Navigation links for desktop menu
 const NAV_LINKS = [
@@ -43,6 +44,7 @@ const MOCK_USER_DATA = {
 export function Header() {
   const { data: session } = useSession();
   const { wallet, isLoading: walletLoading } = useWallet();
+  const { unreadCount } = useUnreadMessages();
 
   /**
    * Clear search-related cookies
@@ -139,12 +141,12 @@ export function Header() {
               <Button variant="ghost" size="icon" className="relative" asChild>
                 <Link href="/messages">
                   <MessageSquare className="w-5 h-5" />
-                  {MOCK_USER_DATA.unreadMessages > 0 && (
+                  {unreadCount > 0 && (
                     <Badge
                       variant="destructive"
                       className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs"
                     >
-                      {MOCK_USER_DATA.unreadMessages}
+                      {unreadCount}
                     </Badge>
                   )}
                 </Link>
