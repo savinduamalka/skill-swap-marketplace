@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd \"Skill Swap\" && pnpm run build",
+  "installCommand": "cd \"Skill Swap\" && pnpm install",
+  "rootDirectory": "Skill Swap"
+}
