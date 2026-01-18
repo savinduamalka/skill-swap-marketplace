@@ -226,10 +226,12 @@ export function MessagesClient() {
   };
 
   const handleSelectConversation = async (connectionId: string) => {
-    setIsLoadingMessages(true);
-
     // Inform context that this conversation is now open
     setCurrentOpenConversation(connectionId);
+
+    // Start loading immediately
+    setIsLoadingMessages(true);
+    setMessages([]); // Clear previous messages
 
     try {
       const response = await fetch(`/api/messages/${connectionId}`);
@@ -241,6 +243,7 @@ export function MessagesClient() {
       }
 
       const data = await response.json();
+      // Set conversation immediately so chat window appears with skeleton
       setSelectedConversation(data.connection);
       setMessages(data.messages);
 
@@ -502,8 +505,20 @@ export function MessagesClient() {
               {/* Message History */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {isLoadingMessages ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Skeleton className="h-12 w-48" />
+                  <div className="space-y-4">
+                    {/* Skeleton messages */}
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}
+                      >
+                        <Skeleton
+                          className={`${
+                            i % 2 === 0 ? 'w-48' : 'w-64'
+                          } h-16 rounded-lg`}
+                        />
+                      </div>
+                    ))}
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
