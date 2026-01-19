@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { Header } from '@/components/layout/header';
 import { MobileNav } from '@/components/layout/mobile-nav';
 import { SearchContent } from './search-content';
@@ -112,11 +113,11 @@ async function searchSkills(
       // Exclude blocked users' skills
       notIn: blockedUserIds.length > 0 ? blockedUserIds : undefined,
     },
-    // Search query - search in name AND alternativeNames
+    // Search query - search in name AND alternativeNames (case-insensitive)
     OR: [
-      { name: { contains: query, mode: 'insensitive' } },
-      { alternativeNames: { contains: query, mode: 'insensitive' } },
-      { description: { contains: query, mode: 'insensitive' } },
+      { name: { contains: query, mode: Prisma.QueryMode.insensitive } },
+      { alternativeNames: { contains: query, mode: Prisma.QueryMode.insensitive } },
+      { description: { contains: query, mode: Prisma.QueryMode.insensitive } },
     ],
   };
 
