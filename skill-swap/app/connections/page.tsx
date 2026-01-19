@@ -69,123 +69,122 @@ export default async function ConnectionsPage() {
 
   const userId = session.user.id;
 
-  let activeConnections, incomingRequests, sentRequests, blockedUsers;
+  // Initialize with empty arrays
+  let activeConnections: Awaited<ReturnType<typeof prisma.connection.findMany>> = [];
+  let incomingRequests: Awaited<ReturnType<typeof prisma.connectionRequest.findMany>> = [];
+  let sentRequests: Awaited<ReturnType<typeof prisma.connectionRequest.findMany>> = [];
+  let blockedUsers: Awaited<ReturnType<typeof prisma.blockedUser.findMany>> = [];
 
   try {
-    // Fetch all connection data in parallel
-    [activeConnections, incomingRequests, sentRequests, blockedUsers] =
-      await Promise.all([
-        // Active connections - where user is either user1 or user2
-        prisma.connection.findMany({
-        where: {
-          OR: [{ user1Id: userId }, { user2Id: userId }],
-          status: 'ACTIVE',
-        },
-        include: {
-          user1: {
-            select: {
-              id: true,
-              fullName: true,
-              name: true,
-              image: true,
-              skillsOffered: {
-                select: { name: true },
-                take: 1,
-              },
-            },
-          },
-          user2: {
-            select: {
-              id: true,
-              fullName: true,
-              name: true,
-              image: true,
-              skillsOffered: {
-                select: { name: true },
-                take: 1,
-              },
+    // Fetch connection data sequentially to avoid exhausting connection pool
+    // (Supabase has limited connections in session mode)
+    
+    // 1. Active connections - where user is either user1 or user2
+    activeConnections = await prisma.connection.findMany({
+      where: {
+        OR: [{ user1Id: userId }, { user2Id: userId }],
+        status: 'ACTIVE',
+      },
+      include: {
+        user1: {
+          select: {
+            id: true,
+            fullName: true,
+            name: true,
+            image: true,
+            skillsOffered: {
+              select: { name: true },
+              take: 1,
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
-      }),
+        user2: {
+          select: {
+            id: true,
+            fullName: true,
+            name: true,
+            image: true,
+            skillsOffered: {
+              select: { name: true },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-      // Incoming pending requests (where user is the receiver)
-      prisma.connectionRequest.findMany({
-        where: {
-          receiverId: userId,
-          status: 'PENDING',
-        },
-        include: {
-          sender: {
-            select: {
-              id: true,
-              fullName: true,
-              name: true,
-              image: true,
-              bio: true,
-              skillsOffered: {
-                select: { name: true },
-                take: 3,
-              },
+    // 2. Incoming pending requests (where user is the receiver)
+    incomingRequests = await prisma.connectionRequest.findMany({
+      where: {
+        receiverId: userId,
+        status: 'PENDING',
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            fullName: true,
+            name: true,
+            image: true,
+            bio: true,
+            skillsOffered: {
+              select: { name: true },
+              take: 3,
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
-      }),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-      // Sent pending requests (where user is the sender)
-      prisma.connectionRequest.findMany({
-        where: {
-          senderId: userId,
-          status: 'PENDING',
-        },
-        include: {
-          receiver: {
-            select: {
-              id: true,
-              fullName: true,
-              name: true,
-              image: true,
-              skillsOffered: {
-                select: { name: true },
-                take: 3,
-              },
+    // 3. Sent pending requests (where user is the sender)
+    sentRequests = await prisma.connectionRequest.findMany({
+      where: {
+        senderId: userId,
+        status: 'PENDING',
+      },
+      include: {
+        receiver: {
+          select: {
+            id: true,
+            fullName: true,
+            name: true,
+            image: true,
+            skillsOffered: {
+              select: { name: true },
+              take: 3,
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
-      }),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-      // Blocked users
-      prisma.blockedUser.findMany({
-        where: {
-          blockerId: userId,
-        },
-        include: {
-          blocked: {
-            select: {
-              id: true,
-              fullName: true,
-              name: true,
-              image: true,
-              skillsOffered: {
-                select: { name: true },
-                take: 3,
-              },
+    // 4. Blocked users
+    blockedUsers = await prisma.blockedUser.findMany({
+      where: {
+        blockerId: userId,
+      },
+      include: {
+        blocked: {
+          select: {
+            id: true,
+            fullName: true,
+            name: true,
+            image: true,
+            skillsOffered: {
+              select: { name: true },
+              take: 3,
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   } catch (error) {
     console.error('Database error in connections page:', error);
-    // Return empty arrays to prevent crash
-    activeConnections = [];
-    incomingRequests = [];
-    sentRequests = [];
-    blockedUsers = [];
+    // Arrays already initialized as empty, page will show empty state
   }
 
   // Process active connections to get the other user

@@ -51,41 +51,41 @@ export async function GET(req: NextRequest) {
     });
 
     // Transform connections into conversation format
-    const conversations = await Promise.all(
-      connections.map(async (conn) => {
-        // Determine the other user in the conversation
-        const otherUser = conn.user1Id === userId ? conn.user2 : conn.user1;
-        const lastMessage = conn.messages[0];
+    // Use sequential processing to avoid exhausting connection pool
+    const conversations = [];
+    for (const conn of connections) {
+      // Determine the other user in the conversation
+      const otherUser = conn.user1Id === userId ? conn.user2 : conn.user1;
+      const lastMessage = conn.messages[0];
 
-        // Count unread messages for this user
-        const unreadCount = await prisma.message.count({
-          where: {
-            connectionId: conn.id,
-            receiverId: userId,
-            isRead: false,
-          },
-        });
+      // Count unread messages for this user
+      const unreadCount = await prisma.message.count({
+        where: {
+          connectionId: conn.id,
+          receiverId: userId,
+          isRead: false,
+        },
+      });
 
-        return {
-          id: conn.id,
-          user: {
-            id: otherUser.id,
-            name: otherUser.name || 'Unknown User',
-            image: otherUser.image,
-          },
-          lastMessage: lastMessage
-            ? {
-                content: lastMessage.content,
-                createdAt: lastMessage.createdAt,
-                isRead: lastMessage.isRead,
-                senderId: lastMessage.senderId,
-              }
-            : null,
-          unreadCount,
-          updatedAt: conn.updatedAt,
-        };
-      })
-    );
+      conversations.push({
+        id: conn.id,
+        user: {
+          id: otherUser.id,
+          name: otherUser.name || 'Unknown User',
+          image: otherUser.image,
+        },
+        lastMessage: lastMessage
+          ? {
+              content: lastMessage.content,
+              createdAt: lastMessage.createdAt,
+              isRead: lastMessage.isRead,
+              senderId: lastMessage.senderId,
+            }
+          : null,
+        unreadCount,
+        updatedAt: conn.updatedAt,
+      });
+    }
 
     return NextResponse.json({ conversations });
   } catch (error) {

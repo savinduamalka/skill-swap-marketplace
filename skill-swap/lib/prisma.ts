@@ -9,9 +9,14 @@ const globalForPrisma = global as unknown as {
 };
 
 function createPrismaClient(): PrismaClient {
-  // Create a PostgreSQL connection pool
+  // Create a PostgreSQL connection pool with limited connections
+  // Supabase free tier has limited connections, so we keep it small
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    max: 5, // Maximum number of connections in the pool
+    min: 1, // Minimum number of connections
+    idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
+    connectionTimeoutMillis: 10000, // Timeout after 10 seconds if no connection available
   });
 
   // Store pool globally to prevent connection leaks

@@ -87,16 +87,15 @@ async function searchSkills(
   const page = Math.max(1, parseInt(searchParams.page || '1'));
 
   // Get blocked user IDs (users current user blocked + users who blocked current user)
-  const [blockedByMe, blockedMe] = await Promise.all([
-    prisma.blockedUser.findMany({
-      where: { blockerId: currentUserId },
-      select: { blockedId: true },
-    }),
-    prisma.blockedUser.findMany({
-      where: { blockedId: currentUserId },
-      select: { blockerId: true },
-    }),
-  ]);
+  // Use sequential queries to avoid exhausting connection pool
+  const blockedByMe = await prisma.blockedUser.findMany({
+    where: { blockerId: currentUserId },
+    select: { blockedId: true },
+  });
+  const blockedMe = await prisma.blockedUser.findMany({
+    where: { blockedId: currentUserId },
+    select: { blockerId: true },
+  });
 
   const blockedUserIds = [
     ...blockedByMe.map((b) => b.blockedId),
