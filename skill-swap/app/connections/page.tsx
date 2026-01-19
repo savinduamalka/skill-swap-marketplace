@@ -69,15 +69,52 @@ export default async function ConnectionsPage() {
 
   const userId = session.user.id;
 
+  // Define types for the included relations
+  type UserSelect = {
+    id: string;
+    fullName: string | null;
+    name: string | null;
+    image: string | null;
+    skillsOffered: { name: string }[];
+  };
+
+  type ConnectionWithUsers = {
+    id: string;
+    user1Id: string;
+    user2Id: string;
+    status: string;
+    createdAt: Date;
+    user1: UserSelect;
+    user2: UserSelect;
+  };
+
+  type RequestWithSender = {
+    id: string;
+    createdAt: Date;
+    sender: UserSelect & { bio: string | null };
+  };
+
+  type RequestWithReceiver = {
+    id: string;
+    createdAt: Date;
+    receiver: UserSelect;
+  };
+
+  type BlockedWithUser = {
+    id: string;
+    createdAt: Date;
+    blocked: UserSelect;
+  };
+
   // Initialize with empty arrays
-  let activeConnections: Awaited<ReturnType<typeof prisma.connection.findMany>> = [];
-  let incomingRequests: Awaited<ReturnType<typeof prisma.connectionRequest.findMany>> = [];
-  let sentRequests: Awaited<ReturnType<typeof prisma.connectionRequest.findMany>> = [];
-  let blockedUsers: Awaited<ReturnType<typeof prisma.blockedUser.findMany>> = [];
+  let activeConnections: ConnectionWithUsers[] = [];
+  let incomingRequests: RequestWithSender[] = [];
+  let sentRequests: RequestWithReceiver[] = [];
+  let blockedUsers: BlockedWithUser[] = [];
 
   try {
     // Fetch connection data sequentially to avoid exhausting connection pool
-    // (Supabase has limited connections in session mode)
+    // (Supabase has limited connections in transaction mode)
     
     // 1. Active connections - where user is either user1 or user2
     activeConnections = await prisma.connection.findMany({
