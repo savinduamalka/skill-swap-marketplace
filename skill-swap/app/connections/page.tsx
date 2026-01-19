@@ -78,6 +78,8 @@ export default async function ConnectionsPage() {
     skillsOffered: { name: string }[];
   };
 
+  type UserSelectWithBio = UserSelect & { bio: string | null };
+
   type ConnectionWithUsers = {
     id: string;
     user1Id: string;
@@ -90,13 +92,23 @@ export default async function ConnectionsPage() {
 
   type RequestWithSender = {
     id: string;
+    senderId: string;
+    receiverId: string;
+    status: string;
+    creditsHeld: number;
     createdAt: Date;
-    sender: UserSelect & { bio: string | null };
+    respondedAt: Date | null;
+    sender: UserSelectWithBio;
   };
 
   type RequestWithReceiver = {
     id: string;
+    senderId: string;
+    receiverId: string;
+    status: string;
+    creditsHeld: number;
     createdAt: Date;
+    respondedAt: Date | null;
     receiver: UserSelect;
   };
 
