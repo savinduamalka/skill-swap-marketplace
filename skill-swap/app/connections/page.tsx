@@ -114,6 +114,7 @@ export default async function ConnectionsPage() {
 
   type BlockedWithUser = {
     id: string;
+    reason: string | null;
     createdAt: Date;
     blocked: UserSelect;
   };
