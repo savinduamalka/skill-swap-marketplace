@@ -69,11 +69,14 @@ export default async function ConnectionsPage() {
 
   const userId = session.user.id;
 
-  // Fetch all connection data in parallel
-  const [activeConnections, incomingRequests, sentRequests, blockedUsers] =
-    await Promise.all([
-      // Active connections - where user is either user1 or user2
-      prisma.connection.findMany({
+  let activeConnections, incomingRequests, sentRequests, blockedUsers;
+
+  try {
+    // Fetch all connection data in parallel
+    [activeConnections, incomingRequests, sentRequests, blockedUsers] =
+      await Promise.all([
+        // Active connections - where user is either user1 or user2
+        prisma.connection.findMany({
         where: {
           OR: [{ user1Id: userId }, { user2Id: userId }],
           status: 'ACTIVE',
@@ -176,6 +179,14 @@ export default async function ConnectionsPage() {
         orderBy: { createdAt: 'desc' },
       }),
     ]);
+  } catch (error) {
+    console.error('Database error in connections page:', error);
+    // Return empty arrays to prevent crash
+    activeConnections = [];
+    incomingRequests = [];
+    sentRequests = [];
+    blockedUsers = [];
+  }
 
   // Process active connections to get the other user
   const processedConnections = activeConnections.map((conn) => {
