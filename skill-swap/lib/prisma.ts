@@ -9,14 +9,21 @@ const globalForPrisma = global as unknown as {
 };
 
 function createPrismaClient(): PrismaClient {
-  // Create a PostgreSQL connection pool with limited connections
-  // Supabase free tier has limited connections, so we keep it small
+  // Create a PostgreSQL connection pool with very conservative limits
+  // Supabase free tier has limited connections (~10-15)
+  // Using transaction pooler (port 6543) is recommended for production
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    max: 5, // Maximum number of connections in the pool
-    min: 1, // Minimum number of connections
-    idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
-    connectionTimeoutMillis: 10000, // Timeout after 10 seconds if no connection available
+    max: 2, // Keep very low for serverless - each Vercel function gets its own pool
+    min: 0, // Allow pool to shrink to 0 when idle
+    idleTimeoutMillis: 10000, // Close idle connections after 10 seconds
+    connectionTimeoutMillis: 15000, // Wait up to 15 seconds for a connection
+    allowExitOnIdle: true, // Allow process to exit when pool is idle
+  });
+
+  // Handle pool errors gracefully
+  pool.on('error', (err) => {
+    console.error('Unexpected database pool error:', err);
   });
 
   // Store pool globally to prevent connection leaks
