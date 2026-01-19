@@ -69,157 +69,176 @@ async function searchSkills(
   totalPages: number;
   currentPage: number;
 } | null> {
-  const query = searchParams.q?.trim() || '';
+  try {
+    const query = searchParams.q?.trim() || '';
 
-  // Return null if no search query - don't fetch any skills
-  if (!query || query.length === 0) {
-    return null;
-  }
-
-  const format = searchParams.format;
-  const proficiency = searchParams.proficiency;
-  const minYears = searchParams.minYears
-    ? parseInt(searchParams.minYears)
-    : undefined;
-  const maxYears = searchParams.maxYears
-    ? parseInt(searchParams.maxYears)
-    : undefined;
-  const page = Math.max(1, parseInt(searchParams.page || '1'));
-
-  // Get blocked user IDs (users current user blocked + users who blocked current user)
-  // Use sequential queries to avoid exhausting connection pool
-  const blockedByMe = await prisma.blockedUser.findMany({
-    where: { blockerId: currentUserId },
-    select: { blockedId: true },
-  });
-  const blockedMe = await prisma.blockedUser.findMany({
-    where: { blockedId: currentUserId },
-    select: { blockerId: true },
-  });
-
-  const blockedUserIds = [
-    ...blockedByMe.map((b) => b.blockedId),
-    ...blockedMe.map((b) => b.blockerId),
-  ];
-
-  // Build where clause for filtering
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const whereClause: any = {
-    isTeaching: true,
-    // Exclude current user's skills
-    ownerId: {
-      not: currentUserId,
-      // Exclude blocked users' skills
-      notIn: blockedUserIds.length > 0 ? blockedUserIds : undefined,
-    },
-    // Search query - search in name AND alternativeNames (case-insensitive)
-    OR: [
-      { name: { contains: query, mode: Prisma.QueryMode.insensitive } },
-      { alternativeNames: { contains: query, mode: Prisma.QueryMode.insensitive } },
-      { description: { contains: query, mode: Prisma.QueryMode.insensitive } },
-    ],
-  };
-
-  // Format filter (skip if 'all' or empty)
-  if (format && format !== 'all' && TEACHING_FORMATS.includes(format)) {
-    whereClause.teachingFormat = format;
-  }
-
-  // Proficiency filter (skip if 'all' or empty)
-  if (
-    proficiency &&
-    proficiency !== 'all' &&
-    PROFICIENCY_LEVELS.includes(proficiency)
-  ) {
-    whereClause.proficiencyLevel = proficiency;
-  }
-
-  // Years of experience filter
-  if (minYears !== undefined || maxYears !== undefined) {
-    whereClause.yearsOfExperience = {};
-    if (minYears !== undefined) {
-      whereClause.yearsOfExperience.gte = minYears;
+    // Return null if no search query - don't fetch any skills
+    if (!query || query.length === 0) {
+      return null;
     }
-    if (maxYears !== undefined) {
-      whereClause.yearsOfExperience.lte = maxYears;
+
+    const format = searchParams.format;
+    const proficiency = searchParams.proficiency;
+    const minYears = searchParams.minYears
+      ? parseInt(searchParams.minYears)
+      : undefined;
+    const maxYears = searchParams.maxYears
+      ? parseInt(searchParams.maxYears)
+      : undefined;
+    const page = Math.max(1, parseInt(searchParams.page || '1'));
+
+    // Get blocked user IDs (users current user blocked + users who blocked current user)
+    // Use sequential queries to avoid exhausting connection pool
+    const blockedByMe = await prisma.blockedUser.findMany({
+      where: { blockerId: currentUserId },
+      select: { blockedId: true },
+    });
+    const blockedMe = await prisma.blockedUser.findMany({
+      where: { blockedId: currentUserId },
+      select: { blockerId: true },
+    });
+
+    const blockedUserIds = [
+      ...blockedByMe.map((b) => b.blockedId),
+      ...blockedMe.map((b) => b.blockerId),
+    ];
+
+    // Build where clause for filtering
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const whereClause: any = {
+      isTeaching: true,
+      // Exclude current user's skills
+      ownerId: {
+        not: currentUserId,
+        // Exclude blocked users' skills
+        notIn: blockedUserIds.length > 0 ? blockedUserIds : undefined,
+      },
+      // Search query - search in name AND alternativeNames (case-insensitive)
+      OR: [
+        { name: { contains: query, mode: Prisma.QueryMode.insensitive } },
+        {
+          alternativeNames: {
+            contains: query,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        },
+        {
+          description: { contains: query, mode: Prisma.QueryMode.insensitive },
+        },
+      ],
+    };
+
+    // Format filter (skip if 'all' or empty)
+    if (format && format !== 'all' && TEACHING_FORMATS.includes(format)) {
+      whereClause.teachingFormat = format;
     }
-  }
 
-  // Get total count for pagination
-  const totalCount = await prisma.skill.count({ where: whereClause });
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+    // Proficiency filter (skip if 'all' or empty)
+    if (
+      proficiency &&
+      proficiency !== 'all' &&
+      PROFICIENCY_LEVELS.includes(proficiency)
+    ) {
+      whereClause.proficiencyLevel = proficiency;
+    }
 
-  // Fetch skills with owner info and reviews
-  const skills = await prisma.skill.findMany({
-    where: whereClause,
-    include: {
-      owner: {
-        select: {
-          id: true,
-          fullName: true,
-          name: true,
-          image: true,
-          bio: true,
+    // Years of experience filter
+    if (minYears !== undefined || maxYears !== undefined) {
+      whereClause.yearsOfExperience = {};
+      if (minYears !== undefined) {
+        whereClause.yearsOfExperience.gte = minYears;
+      }
+      if (maxYears !== undefined) {
+        whereClause.yearsOfExperience.lte = maxYears;
+      }
+    }
+
+    // Get total count for pagination
+    const totalCount = await prisma.skill.count({ where: whereClause });
+    const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+
+    // Fetch skills with owner info and reviews
+    const skills = await prisma.skill.findMany({
+      where: whereClause,
+      include: {
+        owner: {
+          select: {
+            id: true,
+            fullName: true,
+            name: true,
+            image: true,
+            bio: true,
+          },
+        },
+        reviews: {
+          select: {
+            rating: true,
+          },
         },
       },
-      reviews: {
-        select: {
-          rating: true,
-        },
-      },
-    },
-    orderBy: [{ createdAt: 'desc' }],
-    skip: (page - 1) * ITEMS_PER_PAGE,
-    take: ITEMS_PER_PAGE,
-  });
+      orderBy: [{ createdAt: 'desc' }],
+      skip: (page - 1) * ITEMS_PER_PAGE,
+      take: ITEMS_PER_PAGE,
+    });
 
-  // Transform results with computed review stats
-  const skillResults: SkillResult[] = skills.map((skill) => {
-    const reviewCount = skill.reviews.length;
-    const averageRating =
-      reviewCount > 0
-        ? skill.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
-        : null;
+    // Transform results with computed review stats
+    const skillResults: SkillResult[] = skills.map((skill) => {
+      const reviewCount = skill.reviews.length;
+      const averageRating =
+        reviewCount > 0
+          ? skill.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+          : null;
+
+      return {
+        id: skill.id,
+        name: skill.name,
+        description: skill.description,
+        proficiencyLevel: skill.proficiencyLevel,
+        yearsOfExperience: skill.yearsOfExperience,
+        teachingFormat: skill.teachingFormat,
+        availabilityWindow: skill.availabilityWindow,
+        alternativeNames: skill.alternativeNames,
+        owner: skill.owner,
+        reviewCount,
+        averageRating: averageRating
+          ? Math.round(averageRating * 10) / 10
+          : null,
+      };
+    });
 
     return {
-      id: skill.id,
-      name: skill.name,
-      description: skill.description,
-      proficiencyLevel: skill.proficiencyLevel,
-      yearsOfExperience: skill.yearsOfExperience,
-      teachingFormat: skill.teachingFormat,
-      availabilityWindow: skill.availabilityWindow,
-      alternativeNames: skill.alternativeNames,
-      owner: skill.owner,
-      reviewCount,
-      averageRating: averageRating ? Math.round(averageRating * 10) / 10 : null,
+      skills: skillResults,
+      totalCount,
+      totalPages,
+      currentPage: page,
     };
-  });
-
-  return {
-    skills: skillResults,
-    totalCount,
-    totalPages,
-    currentPage: page,
-  };
+  } catch (error) {
+    console.error('Error searching skills:', error);
+    return { skills: [], totalCount: 0, totalPages: 0, currentPage: 1 };
+  }
 }
 
 /**
  * Get user's search history (last 5 searches)
  */
 async function getSearchHistory(userId: string): Promise<SearchHistoryItem[]> {
-  const history = await prisma.searchHistory.findMany({
-    where: { userId },
-    orderBy: { searchedAt: 'desc' },
-    take: 5,
-    select: {
-      id: true,
-      query: true,
-      searchedAt: true,
-    },
-  });
+  try {
+    const history = await prisma.searchHistory.findMany({
+      where: { userId },
+      orderBy: { searchedAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        query: true,
+        searchedAt: true,
+      },
+    });
 
-  return history;
+    return history;
+  } catch (error) {
+    console.error('Error fetching search history:', error);
+    return [];
+  }
 }
 
 export default async function SearchPage({

@@ -40,96 +40,99 @@ async function getInitialPosts(userId: string): Promise<{
   nextCursor: string | null;
   hasMore: boolean;
 }> {
-  // Get blocked user IDs
-  const [blockedByMe, blockedMe] = await Promise.all([
-    prisma.blockedUser.findMany({
+  try {
+    // Get blocked user IDs (sequential to avoid connection pool exhaustion)
+    const blockedByMe = await prisma.blockedUser.findMany({
       where: { blockerId: userId },
       select: { blockedId: true },
-    }),
-    prisma.blockedUser.findMany({
+    });
+    const blockedMe = await prisma.blockedUser.findMany({
       where: { blockedId: userId },
       select: { blockerId: true },
-    }),
-  ]);
+    });
 
-  const blockedUserIds = new Set([
-    ...blockedByMe.map((b) => b.blockedId),
-    ...blockedMe.map((b) => b.blockerId),
-  ]);
+    const blockedUserIds = new Set([
+      ...blockedByMe.map((b) => b.blockedId),
+      ...blockedMe.map((b) => b.blockerId),
+    ]);
 
-  // Fetch posts
-  const posts = await prisma.newsfeedPost.findMany({
-    where: {
-      authorId: {
-        notIn: Array.from(blockedUserIds),
+    // Fetch posts
+    const posts = await prisma.newsfeedPost.findMany({
+      where: {
+        authorId: {
+          notIn: Array.from(blockedUserIds),
+        },
       },
-    },
-    take: POSTS_PER_PAGE + 1,
-    orderBy: {
-      createdAt: 'desc',
-    },
-    include: {
-      author: {
-        select: {
-          id: true,
-          fullName: true,
-          name: true,
-          image: true,
-          skillsOffered: {
-            take: 3,
-            select: {
-              name: true,
+      take: POSTS_PER_PAGE + 1,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            fullName: true,
+            name: true,
+            image: true,
+            skillsOffered: {
+              take: 3,
+              select: {
+                name: true,
+              },
             },
           },
         },
-      },
-      likes: {
-        where: {
-          userId: userId,
+        likes: {
+          where: {
+            userId: userId,
+          },
+          select: {
+            id: true,
+          },
         },
-        select: {
-          id: true,
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+          },
         },
       },
-      _count: {
-        select: {
-          likes: true,
-          comments: true,
-        },
+    });
+
+    const hasMore = posts.length > POSTS_PER_PAGE;
+    const postsToReturn = hasMore ? posts.slice(0, -1) : posts;
+    const nextCursor = hasMore
+      ? postsToReturn[postsToReturn.length - 1]?.id
+      : null;
+
+    const transformedPosts: NewsfeedPost[] = postsToReturn.map((post) => ({
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      mediaUrl: post.mediaUrl,
+      hashtags:
+        post.hashtags
+          ?.split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean) || [],
+      viewCount: post.viewCount,
+      createdAt: post.createdAt,
+      author: {
+        id: post.author.id,
+        name: post.author.fullName || post.author.name || 'Anonymous',
+        image: post.author.image,
+        skills: post.author.skillsOffered.map((s) => s.name),
       },
-    },
-  });
+      likesCount: post._count.likes,
+      commentsCount: post._count.comments,
+      isLiked: post.likes.length > 0,
+    }));
 
-  const hasMore = posts.length > POSTS_PER_PAGE;
-  const postsToReturn = hasMore ? posts.slice(0, -1) : posts;
-  const nextCursor = hasMore
-    ? postsToReturn[postsToReturn.length - 1]?.id
-    : null;
-
-  const transformedPosts: NewsfeedPost[] = postsToReturn.map((post) => ({
-    id: post.id,
-    title: post.title,
-    content: post.content,
-    mediaUrl: post.mediaUrl,
-    hashtags:
-      post.hashtags
-        ?.split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean) || [],
-    viewCount: post.viewCount,
-    createdAt: post.createdAt,
-    author: {
-      id: post.author.id,
-      name: post.author.fullName || post.author.name || 'Anonymous',
-      image: post.author.image,
-      skills: post.author.skillsOffered.map((s) => s.name),
-    },
-    likesCount: post._count.likes,
-    commentsCount: post._count.comments,
-    isLiked: post.likes.length > 0,
-  }));
-
-  return { posts: transformedPosts, nextCursor, hasMore };
+    return { posts: transformedPosts, nextCursor, hasMore };
+  } catch (error) {
+    console.error('Error fetching newsfeed posts:', error);
+    return { posts: [], nextCursor: null, hasMore: false };
+  }
 }
 
 export default async function NewsfeedPage() {

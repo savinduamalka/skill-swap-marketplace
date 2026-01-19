@@ -7,49 +7,54 @@ import { SettingsContent } from './settings-content';
 
 // Fetch user data server-side
 async function getUserSettings(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      fullName: true,
-      name: true,
-      bio: true,
-      timeZone: true,
-      image: true,
-      isVerified: true,
-      createdAt: true,
-      passwordHash: true, // To check if user has a password (non-SSO)
-      skillsOffered: {
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          proficiencyLevel: true,
-          yearsOfExperience: true,
-          teachingFormat: true,
-          availabilityWindow: true,
-          alternativeNames: true,
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        name: true,
+        bio: true,
+        timeZone: true,
+        image: true,
+        isVerified: true,
+        createdAt: true,
+        passwordHash: true, // To check if user has a password (non-SSO)
+        skillsOffered: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            proficiencyLevel: true,
+            yearsOfExperience: true,
+            teachingFormat: true,
+            availabilityWindow: true,
+            alternativeNames: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
         },
-        orderBy: {
-          createdAt: 'desc',
+        skillsWanted: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            proficiencyTarget: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
         },
       },
-      skillsWanted: {
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          proficiencyTarget: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-    },
-  });
+    });
 
-  return user;
+    return user;
+  } catch (error) {
+    console.error('Error fetching user settings:', error);
+    return null;
+  }
 }
 
 export default async function SettingsPage() {

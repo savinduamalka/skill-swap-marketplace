@@ -77,17 +77,15 @@ async function getActiveConnectionCount(
   viewerId: string
 ): Promise<number> {
   try {
-    // Get all blocked user IDs for the profile user
-    const [blockedByProfile, blockedProfile] = await Promise.all([
-      prisma.blockedUser.findMany({
-        where: { blockerId: userId },
-        select: { blockedId: true },
-      }),
-      prisma.blockedUser.findMany({
-        where: { blockedId: userId },
-        select: { blockerId: true },
-      }),
-    ]);
+    // Get all blocked user IDs for the profile user (sequential queries)
+    const blockedByProfile = await prisma.blockedUser.findMany({
+      where: { blockerId: userId },
+      select: { blockedId: true },
+    });
+    const blockedProfile = await prisma.blockedUser.findMany({
+      where: { blockedId: userId },
+      select: { blockerId: true },
+    });
 
     const blockedUserIds = new Set([
       ...blockedByProfile.map((b) => b.blockedId),
@@ -272,26 +270,23 @@ async function checkBlockStatus(
   hasBlockedMe: boolean;
 }> {
   try {
-    const [blockedByMe, blockedMe] = await Promise.all([
-      // Current user blocked the profile user
-      prisma.blockedUser.findUnique({
-        where: {
-          blockerId_blockedId: {
-            blockerId: currentUserId,
-            blockedId: profileUserId,
-          },
+    // Sequential queries to avoid connection pool exhaustion
+    const blockedByMe = await prisma.blockedUser.findUnique({
+      where: {
+        blockerId_blockedId: {
+          blockerId: currentUserId,
+          blockedId: profileUserId,
         },
-      }),
-      // Profile user blocked the current user
-      prisma.blockedUser.findUnique({
-        where: {
-          blockerId_blockedId: {
-            blockerId: profileUserId,
-            blockedId: currentUserId,
-          },
+      },
+    });
+    const blockedMe = await prisma.blockedUser.findUnique({
+      where: {
+        blockerId_blockedId: {
+          blockerId: profileUserId,
+          blockedId: currentUserId,
         },
-      }),
-    ]);
+      },
+    });
 
     return {
       isBlockedByMe: !!blockedByMe,
