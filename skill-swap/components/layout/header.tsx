@@ -32,6 +32,7 @@ const NAV_LINKS = [
   { href: '/search', label: 'Search Skills' },
   { href: '/newsfeed', label: 'Newsfeed' },
   { href: '/connections', label: 'Connections' },
+  { href: '/sessions', label: 'Sessions' },
 ] as const;
 
 // Placeholder values for messages/notifications - would be real-time in production
