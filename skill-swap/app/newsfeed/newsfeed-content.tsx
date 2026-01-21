@@ -75,8 +75,13 @@ export function NewsfeedContent({
     isLoading: boolean;
   }>({ isOpen: false, postId: null, isLoading: false });
 
-  // Saved posts tracking
-  const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
+  // Saved posts tracking - initialize from initial posts
+  const [savedPostIds, setSavedPostIds] = useState<Set<string>>(() => {
+    const savedIds = initialPosts
+      .filter((post) => post.isSaved)
+      .map((post) => post.id);
+    return new Set(savedIds);
+  });
 
   /**
    * Fetch more posts for infinite scroll
@@ -93,6 +98,14 @@ export function NewsfeedContent({
       setPosts((prev) => [...prev, ...data.posts]);
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
+      
+      // Add saved posts from new data to the set
+      const newSavedIds = data.posts
+        .filter((post: NewsfeedPost) => post.isSaved)
+        .map((post: NewsfeedPost) => post.id);
+      if (newSavedIds.length > 0) {
+        setSavedPostIds((prev) => new Set([...prev, ...newSavedIds]));
+      }
     } catch (error) {
       console.error('Error fetching posts:', error);
     } finally {

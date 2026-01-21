@@ -77,6 +77,14 @@ export async function GET(request: NextRequest) {
             id: true,
           },
         },
+        savedBy: {
+          where: {
+            userId: session.user.id,
+          },
+          select: {
+            id: true,
+          },
+        },
         _count: {
           select: {
             likes: true,
@@ -117,6 +125,7 @@ export async function GET(request: NextRequest) {
       likesCount: post._count.likes,
       commentsCount: post._count.comments,
       isLiked: post.likes.length > 0,
+      isSaved: post.savedBy.length > 0,
     }));
 
     return NextResponse.json({

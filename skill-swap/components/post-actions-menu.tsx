@@ -73,7 +73,7 @@ export function PostActionsMenu({
               {isSaved ? (
                 <>
                   <BookmarkCheck className="w-4 h-4" />
-                  <span>Saved</span>
+                  <span>Unsave</span>
                 </>
               ) : (
                 <>

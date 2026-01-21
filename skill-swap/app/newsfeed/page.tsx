@@ -90,6 +90,14 @@ async function getInitialPosts(userId: string): Promise<{
             id: true,
           },
         },
+        savedBy: {
+          where: {
+            userId: userId,
+          },
+          select: {
+            id: true,
+          },
+        },
         _count: {
           select: {
             likes: true,
@@ -126,6 +134,7 @@ async function getInitialPosts(userId: string): Promise<{
       likesCount: post._count.likes,
       commentsCount: post._count.comments,
       isLiked: post.likes.length > 0,
+      isSaved: post.savedBy.length > 0,
     }));
 
     return { posts: transformedPosts, nextCursor, hasMore };
