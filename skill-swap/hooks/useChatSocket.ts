@@ -222,14 +222,17 @@ export const useChatSocket = () => {
 
       // Message events
       socketRef.current.on('receive_message', (message: SocketMessage) => {
+        console.log('[SOCKET] receive_message:', message);
         messageCallbacks.current.forEach((cb) => cb(message));
       });
 
       socketRef.current.on('message_sent', (payload: MessageSentPayload) => {
+        console.log('[SOCKET] message_sent:', payload);
         messageSentCallbacks.current.forEach((cb) => cb(payload));
       });
 
       socketRef.current.on('error', (error: SocketErrorPayload) => {
+        console.error('[SOCKET] error:', error);
         errorCallbacks.current.forEach((cb) => cb(error));
       });
 
@@ -373,9 +376,13 @@ export const useChatSocket = () => {
 
   // Send a message
   const sendMessage = useCallback((payload: SendMessagePayload) => {
+    console.log('[SOCKET] sendMessage called:', payload);
+    console.log('[SOCKET] isConnected:', socketRef.current?.connected);
     if (socketRef.current?.connected) {
       socketRef.current.emit('send_message', payload);
+      console.log('[SOCKET] send_message emitted');
     } else {
+      console.error('[SOCKET] Not connected to chat server');
       errorCallbacks.current.forEach((cb) =>
         cb({ message: 'Not connected to chat server' })
       );

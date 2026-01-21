@@ -278,6 +278,8 @@ io.on('connection', (socket) => {
     // Payload: { connectionId, content, tempId (for optimistic UI) }
     const { connectionId, content, tempId } = payload;
 
+    console.log('[SEND_MESSAGE] Received payload:', { connectionId, content: content?.substring(0, 50), tempId, userId });
+
     try {
       // VALIDATION: Ensure Connection Exists and is Active
       const connection = await prisma.connection.findUnique({
@@ -288,8 +290,11 @@ io.on('connection', (socket) => {
         },
       });
 
+      console.log('[SEND_MESSAGE] Connection found:', connection ? { id: connection.id, status: connection.status, user1Id: connection.user1Id, user2Id: connection.user2Id } : 'null');
+
       // Check if connection exists, is active, and user is part of it
       if (!connection || connection.status !== 'ACTIVE') {
+        console.log('[SEND_MESSAGE] Error: Connection not active or not found');
         socket.emit('error', { message: 'Connection is not active.' });
         return;
       }
@@ -297,6 +302,7 @@ io.on('connection', (socket) => {
       const isUserPartOfConnection =
         connection.user1Id === userId || connection.user2Id === userId;
       if (!isUserPartOfConnection) {
+        console.log('[SEND_MESSAGE] Error: User not part of connection');
         socket.emit('error', {
           message: 'You are not part of this connection.',
         });
@@ -306,6 +312,8 @@ io.on('connection', (socket) => {
       // Determine Receiver
       const receiverId =
         connection.user1Id === userId ? connection.user2Id : connection.user1Id;
+
+      console.log('[SEND_MESSAGE] Creating message for receiver:', receiverId);
 
       // A. Save to Database
       const newMessage = await prisma.message.create({
@@ -318,13 +326,16 @@ io.on('connection', (socket) => {
         },
       });
 
+      console.log('[SEND_MESSAGE] Message saved successfully:', newMessage.id);
+
       // B. Emit to Receiver (Real-time)
       io.to(receiverId).emit('receive_message', newMessage);
 
       // C. Acknowledge Sender
       socket.emit('message_sent', { tempId, savedMessage: newMessage });
+      console.log('[SEND_MESSAGE] Message sent event emitted');
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('[SEND_MESSAGE] Error sending message:', error);
       socket.emit('error', { message: 'Message failed to send.' });
     }
   });

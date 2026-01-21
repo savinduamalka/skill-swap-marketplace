@@ -347,6 +347,7 @@ export function MessagesClient() {
   // Listen for message sent confirmation
   useEffect(() => {
     const unsubscribe = onMessageSent(({ tempId, savedMessage }) => {
+      console.log('[MESSAGE_SENT] Confirmation received:', { tempId, savedMessageId: savedMessage?.id });
       // Replace temp message with saved message (or remove temp if saved already exists)
       setMessages((prev) => {
         // Check if saved message already exists
@@ -375,6 +376,7 @@ export function MessagesClient() {
   // Listen for socket errors
   useEffect(() => {
     const unsubscribe = onError((error) => {
+      console.error('[SOCKET ERROR]', error);
       toast({
         title: 'Connection Error',
         description: error.message,
@@ -528,6 +530,8 @@ export function MessagesClient() {
     const tempId = `temp-${Date.now()}`;
     const content = messageInput.trim();
 
+    console.log('[SEND_MESSAGE] Sending:', { connectionId: selectedConversation.id, content, tempId });
+
     // Optimistic UI update
     const tempMessage: Message = {
       id: tempId,
@@ -563,12 +567,30 @@ export function MessagesClient() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Auto-focus input when conversation is selected
+  // Auto-focus input when conversation is selected or when component mounts with a conversation
   useEffect(() => {
     if (selectedConversation && inputRef.current) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedConversation]);
+
+  // Re-focus input after sending a message
+  useEffect(() => {
+    if (selectedConversation && !isSending && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [selectedConversation, messages]);
+  }, [isSending, selectedConversation]);
+
+  // Focus input when clicking on the chat area
+  const handleChatAreaClick = () => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
 
   // Helper to format call duration
   const formatCallDuration = (seconds: number): string => {
@@ -1061,7 +1083,10 @@ export function MessagesClient() {
 
           {/* Chat Window */}
           {selectedConversation && (
-            <div className="flex-1 flex flex-col md:border-l md:border-border">
+            <div 
+              className="flex-1 flex flex-col md:border-l md:border-border"
+              onClick={handleChatAreaClick}
+            >
               {/* Chat Header */}
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <Link 
