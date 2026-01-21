@@ -50,6 +50,7 @@ import {
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { useWallet } from "@/contexts/wallet-context"
 
 interface Connection {
   id: string
@@ -72,6 +73,7 @@ export function CreateSessionRequestDialog({
   const [loading, setLoading] = useState(false)
   const [connectionsLoading, setConnectionsLoading] = useState(true)
   const [connections, setConnections] = useState<Connection[]>([])
+  const { refreshWallet } = useWallet()
   
   // Form state
   const [sessionName, setSessionName] = useState("")
@@ -153,6 +155,7 @@ export function CreateSessionRequestDialog({
         toast.success("Session request sent! 5 credits deducted.")
         resetForm()
         onOpenChange(false)
+        refreshWallet()
         onSuccess?.()
       } else {
         toast.error(data.error || "Failed to send session request")

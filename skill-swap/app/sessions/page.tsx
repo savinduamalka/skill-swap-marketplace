@@ -34,6 +34,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { CreateSessionRequestDialog } from "@/components/create-session-request-dialog"
+import { useWallet } from "@/contexts/wallet-context"
 
 // Types
 interface User {
@@ -84,6 +85,7 @@ export default function SessionsPage() {
   const [receivedRequests, setReceivedRequests] = useState<SessionRequest[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const { refreshWallet } = useWallet()
 
   // Fetch all data
   const fetchData = useCallback(async () => {
@@ -138,6 +140,7 @@ export default function SessionsPage() {
       if (res.ok) {
         toast.success("Session request accepted!")
         fetchData()
+        refreshWallet()
       } else {
         toast.error(data.error || "Failed to accept request")
       }
@@ -162,6 +165,7 @@ export default function SessionsPage() {
       if (res.ok) {
         toast.success("Session request declined")
         fetchData()
+        refreshWallet()
       } else {
         toast.error(data.error || "Failed to decline request")
       }
@@ -184,6 +188,7 @@ export default function SessionsPage() {
       if (res.ok) {
         toast.success("Session request cancelled. 5 credits refunded.")
         fetchData()
+        refreshWallet()
       } else {
         toast.error(data.error || "Failed to cancel request")
       }
@@ -210,6 +215,7 @@ export default function SessionsPage() {
           toast.success(`Completion confirmed. Waiting for the other party.`)
         }
         fetchData()
+        refreshWallet()
       } else {
         toast.error(data.error || "Failed to complete session")
       }
@@ -234,6 +240,7 @@ export default function SessionsPage() {
       if (res.ok) {
         toast.success("Session cancelled. Credits refunded.")
         fetchData()
+        refreshWallet()
       } else {
         toast.error(data.error || "Failed to cancel session")
       }
