@@ -72,6 +72,8 @@ interface Session {
   skill: { name: string } | null
   learnerCompletionConfirmed: boolean
   providerCompletionConfirmed: boolean
+  learnerCancellationRequested: boolean
+  providerCancellationRequested: boolean
   createdAt: string
   completedAt: string | null
   cancelledAt: string | null
@@ -226,7 +228,7 @@ export default function SessionsPage() {
     }
   }
 
-  // Cancel session
+  // Cancel session (requires mutual consent)
   const handleCancelSession = async (sessionId: string) => {
     setActionLoading(sessionId)
     try {
@@ -238,9 +240,15 @@ export default function SessionsPage() {
 
       const data = await res.json()
       if (res.ok) {
-        toast.success("Session cancelled. Credits refunded.")
+        if (data.status === "CANCELLED") {
+          toast.success("Session cancelled. Credits have been refunded.")
+          refreshWallet()
+        } else {
+          // Pending - waiting for other party
+          const waitingFor = data.waitingFor === "learner" ? "learner" : "provider"
+          toast.success(`Cancellation requested. Waiting for the ${waitingFor} to agree.`)
+        }
         fetchData()
-        refreshWallet()
       } else {
         toast.error(data.error || "Failed to cancel session")
       }
@@ -394,6 +402,12 @@ export default function SessionsPage() {
     const otherConfirmation = isLearner 
       ? session.providerCompletionConfirmed 
       : session.learnerCompletionConfirmed
+    const myCancellation = isLearner
+      ? session.learnerCancellationRequested
+      : session.providerCancellationRequested
+    const otherCancellation = isLearner
+      ? session.providerCancellationRequested
+      : session.learnerCancellationRequested
 
     return (
       <Card 
@@ -468,14 +482,27 @@ export default function SessionsPage() {
               </Badge>
 
               {session.status === "ACTIVE" && (
-                <div className="text-xs text-muted-foreground">
-                  <p>Completion status:</p>
-                  <p className={myConfirmation ? "text-green-600" : ""}>
-                    You: {myConfirmation ? "✓ Confirmed" : "Not confirmed"}
-                  </p>
-                  <p className={otherConfirmation ? "text-green-600" : ""}>
-                    {otherUser.fullName}: {otherConfirmation ? "✓ Confirmed" : "Not confirmed"}
-                  </p>
+                <div className="text-xs text-muted-foreground space-y-3">
+                  <div>
+                    <p className="font-medium">Completion status:</p>
+                    <p className={myConfirmation ? "text-green-600" : ""}>
+                      You: {myConfirmation ? "✓ Confirmed" : "Not confirmed"}
+                    </p>
+                    <p className={otherConfirmation ? "text-green-600" : ""}>
+                      {otherUser.fullName}: {otherConfirmation ? "✓ Confirmed" : "Not confirmed"}
+                    </p>
+                  </div>
+                  {(myCancellation || otherCancellation) && (
+                    <div>
+                      <p className="font-medium text-orange-600">Cancellation requests:</p>
+                      <p className={myCancellation ? "text-orange-600" : ""}>
+                        You: {myCancellation ? "✓ Requested" : "Not requested"}
+                      </p>
+                      <p className={otherCancellation ? "text-orange-600" : ""}>
+                        {otherUser.fullName}: {otherCancellation ? "✓ Requested" : "Not requested"}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -501,15 +528,30 @@ export default function SessionsPage() {
                     Waiting for Partner
                   </Button>
                 )}
-                <Button 
-                  variant="outline" 
-                  className="w-full bg-transparent text-red-600 hover:text-red-700"
-                  onClick={() => handleCancelSession(session.id)}
-                  disabled={actionLoading === session.id}
-                >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Cancel Session
-                </Button>
+                {!myCancellation ? (
+                  <Button 
+                    variant="outline" 
+                    className="w-full bg-transparent text-red-600 hover:text-red-700"
+                    onClick={() => handleCancelSession(session.id)}
+                    disabled={actionLoading === session.id}
+                  >
+                    {actionLoading === session.id ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <XCircle className="w-4 h-4 mr-2" />
+                    )}
+                    Request Cancellation
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    className="w-full bg-transparent text-orange-600"
+                    disabled
+                  >
+                    <Clock className="w-4 h-4 mr-2" />
+                    Waiting for Partner to Cancel
+                  </Button>
+                )}
               </div>
             )}
           </div>
