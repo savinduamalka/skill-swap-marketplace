@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
 import { Header } from '@/components/layout/header';
 import { MobileNav } from '@/components/layout/mobile-nav';
 import { Button } from '@/components/ui/button';
@@ -798,7 +799,10 @@ export function MessagesClient() {
             <div className="flex-1 flex flex-col md:border-l md:border-border">
               {/* Chat Header */}
               <div className="flex items-center justify-between p-4 border-b border-border">
-                <div className="flex items-center gap-3">
+                <Link 
+                  href={`/profile/${selectedConversation.otherUser.id}`}
+                  className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+                >
                   <Avatar className="w-12 h-12 relative">
                     <AvatarImage
                       src={selectedConversation.otherUser.image || ''}
@@ -815,7 +819,7 @@ export function MessagesClient() {
                     ></div>
                   </Avatar>
                   <div>
-                    <p className="font-semibold text-foreground">
+                    <p className="font-semibold text-foreground hover:underline">
                       {selectedConversation.otherUser.name}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -831,7 +835,7 @@ export function MessagesClient() {
                       )}
                     </p>
                   </div>
-                </div>
+                </Link>
                 <div className="flex gap-2">
                   {/* Audio call */}
                   <Button
