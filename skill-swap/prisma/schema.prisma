@@ -262,6 +262,8 @@ model SessionRequest {
   receiverId            String
   skillId               String?
   sessionName           String
+  description           String?   @db.Text
+  mode                  String    @default("ONLINE") // "ONLINE" | "PHYSICAL"
   status                String    @default("PENDING") // "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED"
   creditsHeld           Int       @default(5) // Credits for session request
   startDate             DateTime
@@ -288,7 +290,13 @@ model Session {
   skillId               String
   connectionId          String
   sessionName           String
+  description           String?   @db.Text
+  mode                  String    @default("ONLINE") // "ONLINE" | "PHYSICAL"
   status                String    @default("ACTIVE") // "ACTIVE" | "COMPLETED" | "CANCELLED"
+  learnerCompletionConfirmed  Boolean @default(false)
+  providerCompletionConfirmed Boolean @default(false)
+  cancelledBy           String?   // User ID who cancelled
+  cancelReason          String?   @db.Text
   startDate             DateTime
   endDate               DateTime
   requestCredits        Int       @default(5) // Credits from session request
