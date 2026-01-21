@@ -80,6 +80,8 @@ export async function GET(request: NextRequest) {
         sessionCredits: s.sessionCredits,
         learnerCompletionConfirmed: s.learnerCompletionConfirmed,
         providerCompletionConfirmed: s.providerCompletionConfirmed,
+        learnerCancellationRequested: s.learnerCancellationRequested,
+        providerCancellationRequested: s.providerCancellationRequested,
         createdAt: s.createdAt,
         completedAt: s.completedAt,
         cancelledAt: s.cancelledAt,
