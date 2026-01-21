@@ -101,17 +101,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create a default skill for the session
-    let skillId = sessionRequest.skillId;
+    let skillId: string | null = sessionRequest.skillId;
     if (!skillId) {
-      // Find a skill offered by the receiver (who will be the provider)
+      // Try to find a skill offered by the receiver (who will be the provider)
       const receiverSkill = await prisma.skill.findFirst({
         where: { ownerId: receiverId },
       });
       skillId = receiverSkill?.id || null;
 
+      // If still no skill, try the sender's skill
+      if (!skillId) {
+        const senderSkill = await prisma.skill.findFirst({
+          where: { ownerId: senderId },
+        });
+        skillId = senderSkill?.id || null;
+      }
+
+      // If no skill found at all, return an error
       if (!skillId) {
         return NextResponse.json(
-          { error: 'No skill found for the session' },
+          { error: 'Please add a skill to your profile before accepting session requests' },
           { status: 400 }
         );
       }
