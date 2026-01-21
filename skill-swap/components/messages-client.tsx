@@ -68,6 +68,7 @@ export function MessagesClient() {
     >
   >(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { markConversationAsRead, setCurrentOpenConversation } =
     useUnreadMessages();
@@ -76,6 +77,7 @@ export function MessagesClient() {
   // LiveKit call state
   const [liveKitToken, setLiveKitToken] = useState('');
   const [liveKitUrl, setLiveKitUrl] = useState('');
+  const [callStartTime, setCallStartTime] = useState<Date | null>(null);
   const [callState, setCallState] = useState<
     'idle' | 'incoming' | 'calling' | 'active'
   >('idle');
@@ -419,6 +421,71 @@ export function MessagesClient() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Auto-focus input when conversation is selected
+  useEffect(() => {
+    if (selectedConversation && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [selectedConversation, messages]);
+
+  // Helper to format call duration
+  const formatCallDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins > 0) {
+      return `${mins}m ${secs}s`;
+    }
+    return `${secs}s`;
+  };
+
+  // Helper to add call event message to chat
+  const addCallMessage = useCallback((
+    type: 'call_missed' | 'call_declined' | 'call_ended',
+    isOutgoing: boolean,
+    duration?: number,
+    callTypeUsed?: 'audio' | 'video'
+  ) => {
+    if (!selectedConversation || !session?.user?.id) return;
+
+    let content = '';
+    const callIcon = callTypeUsed === 'audio' ? '📞' : '📹';
+    
+    switch (type) {
+      case 'call_missed':
+        content = isOutgoing 
+          ? `${callIcon} Outgoing call - No answer` 
+          : `${callIcon} Missed call`;
+        break;
+      case 'call_declined':
+        content = isOutgoing 
+          ? `${callIcon} Call declined` 
+          : `${callIcon} You declined the call`;
+        break;
+      case 'call_ended':
+        content = duration 
+          ? `${callIcon} Call ended • ${formatCallDuration(duration)}` 
+          : `${callIcon} Call ended`;
+        break;
+    }
+
+    const callMessage: Message = {
+      id: `call-${Date.now()}`,
+      content,
+      senderId: isOutgoing ? session.user.id : selectedConversation.otherUser.id,
+      senderName: isOutgoing ? 'You' : selectedConversation.otherUser.name,
+      senderImage: null,
+      createdAt: new Date().toISOString(),
+      isRead: true,
+      isOwn: isOutgoing,
+      messageType: type,
+      callDuration: duration,
+      callType: callTypeUsed,
+    };
+
+    setMessages((prev) => [...prev, callMessage]);
+    scrollToBottom();
+  }, [selectedConversation, session?.user?.id]);
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -519,6 +586,7 @@ export function MessagesClient() {
       // Preserve the call type (audio or video) from the incoming call
       setCallType(incomingCallData.callType || 'video');
       setCallState('active');
+      setCallStartTime(new Date()); // Track call start time
     } catch (error) {
       console.error('Error answering call:', error);
       setCallState('incoming');
@@ -534,13 +602,16 @@ export function MessagesClient() {
       connectionId: incomingCallData.connectionId,
     });
 
+    // Add declined call message to chat
+    addCallMessage('call_declined', false, undefined, incomingCallData.callType || 'video');
+
     setIncomingCallData(null);
     setCallState('idle');
     toast({
       title: 'Call Rejected',
       description: 'You rejected the call',
     });
-  }, [incomingCallData, rejectCall, toast]);
+  }, [incomingCallData, rejectCall, toast, addCallMessage]);
 
   // Handle ending active call
   const handleEndCall = useCallback(() => {
@@ -556,18 +627,30 @@ export function MessagesClient() {
       });
     }
 
+    // Calculate call duration if call was active
+    let duration: number | undefined;
+    if (callStartTime) {
+      duration = Math.floor((new Date().getTime() - callStartTime.getTime()) / 1000);
+    }
+
+    // Add call ended message with duration
+    if (callState === 'active' && duration !== undefined) {
+      addCallMessage('call_ended', true, duration, callType);
+    }
+
     setCallState('idle');
     setLiveKitToken('');
     setIncomingCallData(null);
     setIsMuted(false);
     setIsVideoOff(false);
+    setCallStartTime(null);
     toast({
       title: 'Call Ended',
-      description: 'The call has been ended',
+      description: duration ? `Call duration: ${formatCallDuration(duration)}` : 'The call has been ended',
     });
-  }, [incomingCallData, selectedConversation, endCall, toast]);
+  }, [incomingCallData, selectedConversation, endCall, toast, callStartTime, callState, callType, addCallMessage]);
 
-  // Handle cancel outgoing call
+  // Handle cancel outgoing call (no answer / missed)
   const handleCancelCall = useCallback(() => {
     if (selectedConversation) {
       // Notify the receiver that the sender is canceling the outgoing call
@@ -577,15 +660,19 @@ export function MessagesClient() {
       });
     }
 
+    // Add missed call message (outgoing call that wasn't answered)
+    addCallMessage('call_missed', true, undefined, callType);
+
     setCallState('idle');
     setLiveKitToken('');
     setIsMuted(false);
     setIsVideoOff(false);
+    setCallStartTime(null);
     toast({
       title: 'Call Cancelled',
-      description: 'You cancelled the call',
+      description: 'No answer',
     });
-  }, [selectedConversation, rejectCall, toast]);
+  }, [selectedConversation, rejectCall, toast, callType, addCallMessage]);
 
   // Listen for call acceptance (receiver accepted, sender transitions to active)
   useEffect(() => {
@@ -593,6 +680,7 @@ export function MessagesClient() {
       // Sender receives acceptance from receiver
       // Transition from 'calling' to 'active' to show video interface
       setCallState('active');
+      setCallStartTime(new Date()); // Track call start time for sender too
       toast({
         title: 'Call Accepted',
         description: 'Connecting to video call...',
@@ -622,32 +710,50 @@ export function MessagesClient() {
   // Listen for call rejection
   useEffect(() => {
     const unsubscribe = onCallRejected((data) => {
+      // Add declined call message when other user rejects
+      addCallMessage('call_declined', true, undefined, callType);
+      
       setCallState('idle');
       setLiveKitToken('');
       setIncomingCallData(null);
       setIsMuted(false);
       setIsVideoOff(false);
+      setCallStartTime(null);
       toast({
-        title: 'Call Rejected',
-        description: 'The other user rejected your call',
+        title: 'Call Declined',
+        description: 'The other user declined your call',
       });
     });
 
     return unsubscribe;
-  }, [onCallRejected, toast]);
+  }, [onCallRejected, toast, addCallMessage, callType]);
 
-  // Listen for call ending
+  // Listen for call ending (when other party ends the call)
   useEffect(() => {
     const unsubscribe = onCallEnded((data) => {
+      // Calculate call duration if we were in an active call
+      let duration: number | undefined;
+      if (callStartTime) {
+        duration = Math.floor((new Date().getTime() - callStartTime.getTime()) / 1000);
+        // Add call ended message
+        addCallMessage('call_ended', false, duration, callType);
+      }
+
       setCallState('idle');
       setLiveKitToken('');
       setIncomingCallData(null);
       setIsMuted(false);
       setIsVideoOff(false);
+      setCallStartTime(null);
+      
+      toast({
+        title: 'Call Ended',
+        description: duration ? `Call duration: ${formatCallDuration(duration)}` : 'The call has been ended',
+      });
     });
 
     return unsubscribe;
-  }, [onCallEnded]);
+  }, [onCallEnded, callStartTime, callType, addCallMessage, toast]);
 
   if (isLoadingConversations) {
     return (
@@ -896,35 +1002,48 @@ export function MessagesClient() {
                     <div
                       key={msg.id}
                       className={`flex ${
-                        msg.isOwn ? 'justify-end' : 'justify-start'
+                        msg.messageType ? 'justify-center' : msg.isOwn ? 'justify-end' : 'justify-start'
                       }`}
                     >
-                      <div
-                        className={`max-w-xs px-4 py-2 rounded-lg ${
-                          msg.isOwn
-                            ? 'bg-primary text-primary-foreground rounded-br-none'
-                            : 'bg-muted text-foreground rounded-bl-none'
-                        }`}
-                      >
-                        <p className="text-sm">{msg.content}</p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <p
-                            className={`text-xs ${
-                              msg.isOwn ? 'opacity-75' : 'text-muted-foreground'
-                            }`}
-                          >
+                      {/* Call event messages - centered with special styling */}
+                      {msg.messageType ? (
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 text-muted-foreground text-sm">
+                          <span>{msg.content}</span>
+                          <span className="text-xs opacity-75">
                             {formatDistanceToNow(new Date(msg.createdAt), {
                               addSuffix: true,
                             })}
-                          </p>
-                          {msg.isOwn &&
-                            (msg.isRead ? (
-                              <CheckCheck className="w-3 h-3 opacity-75" />
-                            ) : (
-                              <Check className="w-3 h-3 opacity-75" />
-                            ))}
+                          </span>
                         </div>
-                      </div>
+                      ) : (
+                        /* Regular text messages */
+                        <div
+                          className={`max-w-xs px-4 py-2 rounded-lg ${
+                            msg.isOwn
+                              ? 'bg-primary text-primary-foreground rounded-br-none'
+                              : 'bg-muted text-foreground rounded-bl-none'
+                          }`}
+                        >
+                          <p className="text-sm">{msg.content}</p>
+                          <div className="flex items-center gap-1 mt-1">
+                            <p
+                              className={`text-xs ${
+                                msg.isOwn ? 'opacity-75' : 'text-muted-foreground'
+                              }`}
+                            >
+                              {formatDistanceToNow(new Date(msg.createdAt), {
+                                addSuffix: true,
+                              })}
+                            </p>
+                            {msg.isOwn &&
+                              (msg.isRead ? (
+                                <CheckCheck className="w-3 h-3 opacity-75" />
+                              ) : (
+                                <Check className="w-3 h-3 opacity-75" />
+                              ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -934,11 +1053,13 @@ export function MessagesClient() {
               {/* Message Input */}
               <div className="p-4 border-t border-border flex gap-2">
                 <Input
+                  ref={inputRef}
                   placeholder="Type a message..."
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
                   onKeyPress={handleKeyPress}
                   disabled={!isConnected || isSending}
+                  autoFocus
                 />
                 <Button
                   size="icon"

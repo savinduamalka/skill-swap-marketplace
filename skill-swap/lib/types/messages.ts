@@ -3,6 +3,8 @@
  * Shared types for real-time messaging
  */
 
+export type MessageType = 'text' | 'call_missed' | 'call_declined' | 'call_ended';
+
 export interface Message {
   id: string;
   content: string;
@@ -12,6 +14,9 @@ export interface Message {
   createdAt: Date | string;
   isRead: boolean;
   isOwn: boolean;
+  messageType?: MessageType;
+  callDuration?: number; // Duration in seconds for ended calls
+  callType?: 'audio' | 'video';
 }
 
 export interface Conversation {
