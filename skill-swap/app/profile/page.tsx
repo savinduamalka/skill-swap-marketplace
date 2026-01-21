@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MessageSquare, Users, Star, Calendar, Settings } from 'lucide-react';
+import { MessageSquare, Users, Star, Calendar, Settings, Bookmark } from 'lucide-react';
 import Link from 'next/link';
 import { UserPostsSection } from './user-posts-section';
 
@@ -205,6 +205,12 @@ export default function ProfilePage() {
 
                   {/* Action Buttons */}
                   <div className="flex gap-2">
+                    <Link href="/saved-posts">
+                      <Button variant="outline" className="bg-transparent">
+                        <Bookmark className="w-4 h-4 mr-2" />
+                        Saved Posts
+                      </Button>
+                    </Link>
                     <Link href="/settings">
                       <Button variant="outline" className="bg-transparent">
                         <Settings className="w-4 h-4 mr-2" />
