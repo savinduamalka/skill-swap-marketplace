@@ -32,6 +32,8 @@ import {
   Check,
   CheckCheck,
   X,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +58,13 @@ export function MessagesClient() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // In-chat message search
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [showChatSearch, setShowChatSearch] = useState(false);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Enhanced online status tracking (with last seen)
   const [userStatusMap, setUserStatusMap] = useState<
@@ -235,6 +244,62 @@ export function MessagesClient() {
     const status = userStatusMap.get(userId);
     return status?.isOnline ? 'bg-green-500' : 'bg-gray-400';
   };
+
+  // ==================== IN-CHAT SEARCH LOGIC ====================
+  
+  // Get messages that match the search query (case-insensitive)
+  const searchResults = chatSearchQuery.trim()
+    ? messages.filter(
+        (msg) =>
+          !msg.messageType && // Exclude call events
+          msg.content.toLowerCase().includes(chatSearchQuery.toLowerCase())
+      )
+    : [];
+
+  // Navigate to next search result
+  const goToNextResult = () => {
+    if (searchResults.length === 0) return;
+    const nextIndex = (currentSearchIndex + 1) % searchResults.length;
+    setCurrentSearchIndex(nextIndex);
+    scrollToMessage(searchResults[nextIndex].id);
+  };
+
+  // Navigate to previous search result
+  const goToPrevResult = () => {
+    if (searchResults.length === 0) return;
+    const prevIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1;
+    setCurrentSearchIndex(prevIndex);
+    scrollToMessage(searchResults[prevIndex].id);
+  };
+
+  // Scroll to a specific message
+  const scrollToMessage = (messageId: string) => {
+    const element = messageRefs.current.get(messageId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Add a brief highlight animation
+      element.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+      setTimeout(() => {
+        element.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+      }, 2000);
+    }
+  };
+
+  // Reset search when conversation changes
+  useEffect(() => {
+    setChatSearchQuery('');
+    setShowChatSearch(false);
+    setCurrentSearchIndex(0);
+    messageRefs.current.clear();
+  }, [selectedConversation?.id]);
+
+  // Reset current index when search query changes
+  useEffect(() => {
+    setCurrentSearchIndex(0);
+    if (searchResults.length > 0) {
+      scrollToMessage(searchResults[0].id);
+    }
+  }, [chatSearchQuery]);
 
   // Listen for incoming messages
   useEffect(() => {
@@ -910,13 +975,30 @@ export function MessagesClient() {
                 <Input
                   placeholder="Search conversations..."
                   className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Conversation Items */}
             <div className="flex-1 overflow-y-auto space-y-2">
-              {conversations.map((conv) => (
+              {conversations
+                .filter((conv) =>
+                  searchQuery.trim() === ''
+                    ? true
+                    : conv.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (conv.lastMessage?.content?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+                )
+                .map((conv) => (
                 <Card
                   key={conv.id}
                   className={`p-4 cursor-pointer hover:bg-muted transition ${
@@ -1048,8 +1130,74 @@ export function MessagesClient() {
                   <Button size="icon" variant="ghost" title="More options">
                     <MoreVertical className="w-4 h-4" />
                   </Button>
+                  {/* Search in chat */}
+                  <Button
+                    size="icon"
+                    variant={showChatSearch ? 'default' : 'ghost'}
+                    title="Search in chat"
+                    onClick={() => setShowChatSearch(!showChatSearch)}
+                  >
+                    <Search className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
+
+              {/* In-Chat Search Bar */}
+              {showChatSearch && (
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30">
+                  <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <Input
+                    placeholder="Search messages..."
+                    value={chatSearchQuery}
+                    onChange={(e) => setChatSearchQuery(e.target.value)}
+                    className="flex-1 h-8"
+                    autoFocus
+                  />
+                  {chatSearchQuery && (
+                    <>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {searchResults.length > 0
+                          ? `${currentSearchIndex + 1} of ${searchResults.length}`
+                          : 'No results'}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={goToPrevResult}
+                          disabled={searchResults.length === 0}
+                          title="Previous result"
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={goToNextResult}
+                          disabled={searchResults.length === 0}
+                          title="Next result"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      setShowChatSearch(false);
+                      setChatSearchQuery('');
+                    }}
+                    title="Close search"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
 
               {/* Message History */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1074,42 +1222,71 @@ export function MessagesClient() {
                     No messages yet. Start the conversation!
                   </div>
                 ) : (
-                  messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${
-                        msg.messageType ? 'justify-center' : msg.isOwn ? 'justify-end' : 'justify-start'
-                      }`}
-                    >
-                      {/* Call event messages - centered with special styling */}
-                      {msg.messageType ? (
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 text-muted-foreground text-sm">
-                          <span>{msg.content}</span>
-                          <span className="text-xs opacity-75">
-                            {formatDistanceToNow(new Date(msg.createdAt), {
-                              addSuffix: true,
-                            })}
-                          </span>
-                        </div>
-                      ) : (
-                        /* Regular text messages */
-                        <div
-                          className={`max-w-xs px-4 py-2 rounded-lg ${
-                            msg.isOwn
-                              ? 'bg-primary text-primary-foreground rounded-br-none'
-                              : 'bg-muted text-foreground rounded-bl-none'
-                          }`}
-                        >
-                          <p className="text-sm">{msg.content}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            <p
-                              className={`text-xs ${
-                                msg.isOwn ? 'opacity-75' : 'text-muted-foreground'
-                              }`}
-                            >
+                  messages.map((msg) => {
+                    const isSearchMatch = chatSearchQuery.trim() && 
+                      !msg.messageType && 
+                      msg.content.toLowerCase().includes(chatSearchQuery.toLowerCase());
+                    const isCurrentSearchResult = searchResults[currentSearchIndex]?.id === msg.id;
+                    
+                    // Highlight matching text in message
+                    const highlightText = (text: string) => {
+                      if (!chatSearchQuery.trim() || !isSearchMatch) return text;
+                      const regex = new RegExp(`(${chatSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                      const parts = text.split(regex);
+                      return parts.map((part, i) =>
+                        regex.test(part) ? (
+                          <mark key={i} className="bg-yellow-300 dark:bg-yellow-600 text-foreground rounded px-0.5">
+                            {part}
+                          </mark>
+                        ) : (
+                          part
+                        )
+                      );
+                    };
+
+                    return (
+                      <div
+                        key={msg.id}
+                        ref={(el) => {
+                          if (el && !msg.messageType) {
+                            messageRefs.current.set(msg.id, el);
+                          }
+                        }}
+                        className={`flex transition-all duration-300 ${
+                          msg.messageType ? 'justify-center' : msg.isOwn ? 'justify-end' : 'justify-start'
+                        } ${isCurrentSearchResult ? 'scale-[1.02]' : ''}`}
+                      >
+                        {/* Call event messages - centered with special styling */}
+                        {msg.messageType ? (
+                          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 text-muted-foreground text-sm">
+                            <span>{msg.content}</span>
+                            <span className="text-xs opacity-75">
                               {formatDistanceToNow(new Date(msg.createdAt), {
                                 addSuffix: true,
                               })}
+                            </span>
+                          </div>
+                        ) : (
+                          /* Regular text messages */
+                          <div
+                            className={`max-w-xs px-4 py-2 rounded-lg transition-all duration-300 ${
+                              msg.isOwn
+                                ? 'bg-primary text-primary-foreground rounded-br-none'
+                                : 'bg-muted text-foreground rounded-bl-none'
+                            } ${isSearchMatch ? 'ring-2 ring-yellow-400 dark:ring-yellow-500' : ''} ${
+                              isCurrentSearchResult ? 'ring-2 ring-primary shadow-lg' : ''
+                            }`}
+                          >
+                            <p className="text-sm">{highlightText(msg.content)}</p>
+                            <div className="flex items-center gap-1 mt-1">
+                              <p
+                                className={`text-xs ${
+                                  msg.isOwn ? 'opacity-75' : 'text-muted-foreground'
+                                }`}
+                              >
+                                {formatDistanceToNow(new Date(msg.createdAt), {
+                                  addSuffix: true,
+                                })}
                             </p>
                             {msg.isOwn &&
                               (msg.isRead ? (
@@ -1121,7 +1298,8 @@ export function MessagesClient() {
                         </div>
                       )}
                     </div>
-                  ))
+                  );
+                  })
                 )}
                 <div ref={messagesEndRef} />
               </div>
