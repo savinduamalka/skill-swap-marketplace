@@ -10,6 +10,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { Header } from '@/components/layout/header';
@@ -73,6 +74,14 @@ export function MessagesClient() {
   const { markConversationAsRead, setCurrentOpenConversation } =
     useUnreadMessages();
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Check for auto-answer params from global call notification
+  const autoAnswerConversation = searchParams.get('conversation');
+  const shouldAutoAnswer = searchParams.get('answer') === 'true';
+  const autoAnswerRoomName = searchParams.get('roomName');
+  const autoAnswerCallType = searchParams.get('callType') as 'audio' | 'video' | null;
 
   // LiveKit call state
   const [liveKitToken, setLiveKitToken] = useState('');
@@ -113,6 +122,73 @@ export function MessagesClient() {
   useEffect(() => {
     fetchConversations();
   }, []);
+
+  // Handle auto-answer from global call notification
+  useEffect(() => {
+    const handleAutoAnswer = async () => {
+      if (
+        shouldAutoAnswer &&
+        autoAnswerConversation &&
+        autoAnswerRoomName &&
+        autoAnswerCallType &&
+        conversations.length > 0 &&
+        !selectedConversation &&
+        session?.user
+      ) {
+        // First, select the conversation
+        await handleSelectConversation(autoAnswerConversation);
+
+        // Generate token for the room
+        try {
+          const response = await fetch('/api/livekit/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              roomName: autoAnswerRoomName,
+              userName: session.user.name || 'User',
+              userId: session.user.id || 'unknown',
+            }),
+          });
+
+          if (!response.ok) throw new Error('Failed to generate token');
+
+          const { token, url } = await response.json();
+          setLiveKitToken(token);
+          setLiveKitUrl(url);
+          currentRoomNameRef.current = autoAnswerRoomName;
+          setCallType(autoAnswerCallType);
+          setCallState('active');
+          setCallStartTime(new Date());
+
+          // Clear the URL params to prevent re-triggering
+          router.replace('/messages', { scroll: false });
+
+          toast({
+            title: 'Call Connected',
+            description: `${autoAnswerCallType === 'video' ? 'Video' : 'Audio'} call started`,
+          });
+        } catch (error) {
+          console.error('Error auto-answering call:', error);
+          toast({
+            title: 'Call Failed',
+            description: 'Failed to connect to the call',
+            variant: 'destructive',
+          });
+          router.replace('/messages', { scroll: false });
+        }
+      }
+    };
+
+    handleAutoAnswer();
+  }, [
+    shouldAutoAnswer,
+    autoAnswerConversation,
+    autoAnswerRoomName,
+    autoAnswerCallType,
+    conversations,
+    selectedConversation,
+    session,
+  ]);
 
   // ==================== UTILITY FUNCTIONS ====================
   /**
