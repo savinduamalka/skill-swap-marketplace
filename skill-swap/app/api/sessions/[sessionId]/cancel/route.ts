@@ -1,9 +1,9 @@
 /**
  * Session Cancellation API Route
  *
- * POST - Cancel an active session
- * Both parties must agree for fair cancellation
- * If one party cancels, the other can dispute
+ * POST - Request to cancel an active session
+ * REQUIRES MUTUAL CONSENT: Both learner and provider must agree to cancel
+ * When both agree, credits are refunded to the learner
  *
  * @fileoverview POST /api/sessions/[sessionId]/cancel
  */
@@ -61,62 +61,100 @@ export async function POST(
       );
     }
 
-    // Get wallets
-    const learnerWallet = await prisma.wallet.findUnique({
-      where: { userId: sessionRecord.learnerId },
-    });
-    const providerWallet = await prisma.wallet.findUnique({
-      where: { userId: sessionRecord.providerId },
-    });
-
-    if (!learnerWallet || !providerWallet) {
+    // Check if user has already requested cancellation
+    if (isLearner && sessionRecord.learnerCancellationRequested) {
       return NextResponse.json(
-        { error: 'Wallet not found' },
+        { error: 'You have already requested cancellation. Waiting for the other party to agree.' },
         { status: 400 }
       );
     }
 
-    // Cancel session and refund credits to learner
-    await prisma.$transaction(async (tx) => {
-      // 1. Mark session as cancelled
-      await tx.session.update({
-        where: { id: sessionId },
-        data: {
-          status: 'CANCELLED',
-          cancelledBy: userId,
-          cancelReason: reason || null,
-          cancelledAt: new Date(),
-        },
-      });
+    if (isProvider && sessionRecord.providerCancellationRequested) {
+      return NextResponse.json(
+        { error: 'You have already requested cancellation. Waiting for the other party to agree.' },
+        { status: 400 }
+      );
+    }
 
-      // 2. Refund session credits from learner's outgoing to available
-      await tx.wallet.update({
+    // Check if this cancellation request will complete the cancellation (mutual consent)
+    const willCancel =
+      (isLearner && sessionRecord.providerCancellationRequested) ||
+      (isProvider && sessionRecord.learnerCancellationRequested);
+
+    if (willCancel) {
+      // Both parties have agreed - cancel the session and refund credits
+      const learnerWallet = await prisma.wallet.findUnique({
         where: { userId: sessionRecord.learnerId },
-        data: {
-          outgoingBalance: { decrement: sessionRecord.sessionCredits },
-          availableBalance: { increment: sessionRecord.sessionCredits },
-        },
       });
 
-      // 3. Create transaction record for refund
-      await tx.transaction.create({
-        data: {
-          walletId: learnerWallet.id,
-          amount: sessionRecord.sessionCredits,
-          type: 'SESSION_CANCELLED',
-          status: 'COMPLETED',
-          relatedUserId: sessionRecord.providerId,
-          sessionId: sessionId,
-          note: `Session cancelled: ${sessionRecord.sessionName} - credits refunded`,
-        },
-      });
-    });
+      if (!learnerWallet) {
+        return NextResponse.json(
+          { error: 'Wallet not found' },
+          { status: 400 }
+        );
+      }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Session cancelled. Credits have been refunded.',
-      creditsRefunded: sessionRecord.sessionCredits,
-    });
+      await prisma.$transaction(async (tx) => {
+        // 1. Mark session as cancelled with both flags
+        await tx.session.update({
+          where: { id: sessionId },
+          data: {
+            status: 'CANCELLED',
+            learnerCancellationRequested: true,
+            providerCancellationRequested: true,
+            cancelledBy: userId,
+            cancelReason: reason || 'Mutual cancellation agreement',
+            cancelledAt: new Date(),
+          },
+        });
+
+        // 2. Refund session credits from learner's outgoing to available
+        await tx.wallet.update({
+          where: { userId: sessionRecord.learnerId },
+          data: {
+            outgoingBalance: { decrement: sessionRecord.sessionCredits },
+            availableBalance: { increment: sessionRecord.sessionCredits },
+          },
+        });
+
+        // 3. Create transaction record for refund
+        await tx.transaction.create({
+          data: {
+            walletId: learnerWallet.id,
+            amount: sessionRecord.sessionCredits,
+            type: 'SESSION_CANCELLED',
+            status: 'COMPLETED',
+            relatedUserId: sessionRecord.providerId,
+            sessionId: sessionId,
+            note: `Session cancelled by mutual agreement: ${sessionRecord.sessionName} - ${sessionRecord.sessionCredits} credits refunded`,
+          },
+        });
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Session cancelled by mutual agreement. Credits have been refunded to the learner.',
+        sessionCancelled: true,
+        creditsRefunded: sessionRecord.sessionCredits,
+      });
+    } else {
+      // Update only this user's cancellation flag
+      await prisma.session.update({
+        where: { id: sessionId },
+        data: isLearner
+          ? { learnerCancellationRequested: true, cancelReason: reason || null }
+          : { providerCancellationRequested: true, cancelReason: reason || null },
+      });
+
+      const otherUser = isLearner ? sessionRecord.provider : sessionRecord.learner;
+
+      return NextResponse.json({
+        success: true,
+        message: `Cancellation requested. Waiting for ${otherUser.fullName || 'the other party'} to agree.`,
+        sessionCancelled: false,
+        waitingFor: isLearner ? 'provider' : 'learner',
+      });
+    }
   } catch (error) {
     console.error('Error cancelling session:', error);
     return NextResponse.json(
