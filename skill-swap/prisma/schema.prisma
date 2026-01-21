@@ -295,7 +295,9 @@ model Session {
   status                String    @default("ACTIVE") // "ACTIVE" | "COMPLETED" | "CANCELLED"
   learnerCompletionConfirmed  Boolean @default(false)
   providerCompletionConfirmed Boolean @default(false)
-  cancelledBy           String?   // User ID who cancelled
+  learnerCancellationRequested  Boolean @default(false)
+  providerCancellationRequested Boolean @default(false)
+  cancelledBy           String?   // User ID who initiated final cancellation
   cancelReason          String?   @db.Text
   startDate             DateTime
   endDate               DateTime
