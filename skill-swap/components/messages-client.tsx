@@ -347,7 +347,6 @@ export function MessagesClient() {
   // Listen for message sent confirmation
   useEffect(() => {
     const unsubscribe = onMessageSent(({ tempId, savedMessage }) => {
-      console.log('[MESSAGE_SENT] Confirmation received:', { tempId, savedMessageId: savedMessage?.id });
       // Replace temp message with saved message (or remove temp if saved already exists)
       setMessages((prev) => {
         // Check if saved message already exists
@@ -376,10 +375,9 @@ export function MessagesClient() {
   // Listen for socket errors
   useEffect(() => {
     const unsubscribe = onError((error) => {
-      console.error('[SOCKET ERROR]', error);
       toast({
         title: 'Connection Error',
-        description: error.message,
+        description: error.message || 'Failed to send message',
         variant: 'destructive',
       });
       setIsSending(false);
@@ -529,8 +527,6 @@ export function MessagesClient() {
 
     const tempId = `temp-${Date.now()}`;
     const content = messageInput.trim();
-
-    console.log('[SEND_MESSAGE] Sending:', { connectionId: selectedConversation.id, content, tempId });
 
     // Optimistic UI update
     const tempMessage: Message = {
