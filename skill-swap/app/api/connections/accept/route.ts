@@ -126,13 +126,21 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 6. Create Connection record between the two users
+      // 6. Create or reactivate Connection record between the two users
       // Always put the smaller ID as user1Id for consistency
       const [user1Id, user2Id] =
         senderId < receiverId ? [senderId, receiverId] : [receiverId, senderId];
 
-      const connection = await tx.connection.create({
-        data: {
+      // Use upsert to handle case where connection might already exist (e.g., was previously ended)
+      const connection = await tx.connection.upsert({
+        where: {
+          user1Id_user2Id: { user1Id, user2Id },
+        },
+        update: {
+          status: 'ACTIVE',
+          updatedAt: new Date(),
+        },
+        create: {
           user1Id,
           user2Id,
           status: 'ACTIVE',
@@ -156,8 +164,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error accepting connection request:', error);
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
     return NextResponse.json(
-      { error: 'Failed to accept connection request' },
+      { error: 'Failed to accept connection request', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
