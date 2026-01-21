@@ -41,6 +41,7 @@ import { useUnreadMessages } from '@/contexts/unread-messages-context';
 import PrebuiltVideoCall from '@/components/livekit-prebuilt-call';
 import AudioCallInterface from '@/components/livekit-audio-call-interface';
 import { LiveKitCallInterface } from '@/components/livekit-call-interface';
+import { EmojiPicker } from '@/components/ui/emoji-picker';
 import { useSession } from 'next-auth/react';
 import type {
   Conversation,
@@ -1305,7 +1306,14 @@ export function MessagesClient() {
               </div>
 
               {/* Message Input */}
-              <div className="p-4 border-t border-border flex gap-2">
+              <div className="p-4 border-t border-border flex gap-2 items-center">
+                <EmojiPicker
+                  onEmojiSelect={(emoji) => {
+                    setMessageInput((prev) => prev + emoji);
+                    inputRef.current?.focus();
+                  }}
+                  disabled={!isConnected || isSending}
+                />
                 <Input
                   ref={inputRef}
                   placeholder="Type a message..."
