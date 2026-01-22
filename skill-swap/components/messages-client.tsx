@@ -34,6 +34,11 @@ import {
   X,
   ChevronUp,
   ChevronDown,
+  Paperclip,
+  Image as ImageIcon,
+  File as FileIcon,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useToast } from '@/hooks/use-toast';
@@ -60,6 +65,15 @@ export function MessagesClient() {
   const [isSending, setIsSending] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Media upload state
+  const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [showMediaPreview, setShowMediaPreview] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // In-chat message search
   const [chatSearchQuery, setChatSearchQuery] = useState('');
@@ -522,7 +536,146 @@ export function MessagesClient() {
     }
   };
 
+  // Handle file selection for media upload
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (100MB max for any file)
+    const maxSize = 100 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'File too large',
+        description: 'Maximum file size is 100MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSelectedMedia(file);
+    
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setMediaPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setMediaPreview(null);
+    }
+    
+    setShowMediaPreview(true);
+  };
+
+  // Cancel media selection
+  const cancelMediaSelection = () => {
+    setSelectedMedia(null);
+    setMediaPreview(null);
+    setShowMediaPreview(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Upload media to Supabase and send message
+  const handleSendMediaMessage = async () => {
+    if (!selectedMedia || !selectedConversation || isUploading) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Create FormData
+      const formData = new FormData();
+      formData.append('file', selectedMedia);
+      formData.append('connectionId', selectedConversation.id);
+
+      // Upload to API
+      const response = await fetch('/api/messages/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const { media } = await response.json();
+      setUploadProgress(100);
+
+      // Create temp message for optimistic UI
+      const tempId = `temp-${Date.now()}`;
+      const tempMessage: Message = {
+        id: tempId,
+        content: messageInput.trim() || '',
+        senderId: 'current-user',
+        senderName: 'You',
+        senderImage: null,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+        isOwn: true,
+        mediaUrl: media.url,
+        mediaType: media.type,
+        mediaName: media.name,
+        mediaSize: media.size,
+        mediaThumbnail: media.thumbnail,
+      };
+
+      setMessages((prev) => [...prev, tempMessage]);
+
+      // Send via socket with media info
+      sendMessage({
+        connectionId: selectedConversation.id,
+        content: messageInput.trim() || '',
+        tempId,
+        mediaUrl: media.url,
+        mediaType: media.type,
+        mediaName: media.name,
+        mediaSize: media.size,
+        mediaThumbnail: media.thumbnail,
+      });
+
+      // Clear media state
+      cancelMediaSelection();
+      setMessageInput('');
+    } catch (error) {
+      toast({
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'Failed to upload media',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  // Format file size for display
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  // Get media type icon
+  const getMediaTypeIcon = (type: string) => {
+    switch (type) {
+      case 'image':
+        return <ImageIcon className="w-4 h-4" />;
+      default:
+        return <FileIcon className="w-4 h-4" />;
+    }
+  };
+
   const handleSendMessage = () => {
+    // If there's media selected, use media send flow
+    if (selectedMedia) {
+      handleSendMediaMessage();
+      return;
+    }
+
     if (!messageInput.trim() || !selectedConversation || isSending) return;
 
     const tempId = `temp-${Date.now()}`;
@@ -1289,18 +1442,81 @@ export function MessagesClient() {
                             </span>
                           </div>
                         ) : (
-                          /* Regular text messages */
+                          /* Regular text/media messages */
                           <div
-                            className={`max-w-xs px-4 py-2 rounded-lg transition-all duration-300 ${
+                            className={`max-w-xs rounded-lg transition-all duration-300 ${
                               msg.isOwn
                                 ? 'bg-primary text-primary-foreground rounded-br-none'
                                 : 'bg-muted text-foreground rounded-bl-none'
                             } ${isSearchMatch ? 'ring-2 ring-yellow-400 dark:ring-yellow-500' : ''} ${
                               isCurrentSearchResult ? 'ring-2 ring-primary shadow-lg' : ''
-                            }`}
+                            } ${msg.mediaUrl ? 'overflow-hidden' : 'px-4 py-2'}`}
                           >
-                            <p className="text-sm">{highlightText(msg.content)}</p>
-                            <div className="flex items-center gap-1 mt-1">
+                            {/* Media Content */}
+                            {msg.mediaUrl && msg.mediaType === 'image' && (
+                              <div 
+                                className="cursor-pointer"
+                                onClick={() => setLightboxImage(msg.mediaUrl!)}
+                              >
+                                <img
+                                  src={msg.mediaUrl}
+                                  alt={msg.mediaName || 'Image'}
+                                  className="max-w-full rounded-t-lg object-cover"
+                                  style={{ maxHeight: '300px' }}
+                                />
+                              </div>
+                            )}
+                            
+                            {msg.mediaUrl && msg.mediaType === 'video' && (
+                              <video
+                                src={msg.mediaUrl}
+                                controls
+                                className="max-w-full rounded-t-lg"
+                                style={{ maxHeight: '300px' }}
+                              />
+                            )}
+                            
+                            {msg.mediaUrl && msg.mediaType === 'audio' && (
+                              <div className="p-3">
+                                <audio src={msg.mediaUrl} controls className="w-full" />
+                              </div>
+                            )}
+                            
+                            {msg.mediaUrl && msg.mediaType === 'file' && (
+                              <a
+                                href={msg.mediaUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`flex items-center gap-3 p-3 hover:opacity-80 transition ${
+                                  msg.isOwn ? 'text-primary-foreground' : 'text-foreground'
+                                }`}
+                              >
+                                <div className={`p-2 rounded-lg ${msg.isOwn ? 'bg-primary-foreground/20' : 'bg-background'}`}>
+                                  <FileIcon className="w-6 h-6" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">
+                                    {msg.mediaName || 'File'}
+                                  </p>
+                                  {msg.mediaSize && (
+                                    <p className="text-xs opacity-75">
+                                      {formatFileSize(msg.mediaSize)}
+                                    </p>
+                                  )}
+                                </div>
+                                <Download className="w-4 h-4" />
+                              </a>
+                            )}
+                            
+                            {/* Text Content (caption for media or regular message) */}
+                            {msg.content && (
+                              <div className={msg.mediaUrl ? 'px-4 py-2' : ''}>
+                                <p className="text-sm">{highlightText(msg.content)}</p>
+                              </div>
+                            )}
+                            
+                            {/* Timestamp and read status */}
+                            <div className={`flex items-center gap-1 ${msg.mediaUrl ? 'px-4 pb-2' : 'mt-1'}`}>
                               <p
                                 className={`text-xs ${
                                   msg.isOwn ? 'opacity-75' : 'text-muted-foreground'
@@ -1327,31 +1543,101 @@ export function MessagesClient() {
               </div>
 
               {/* Message Input */}
-              <div className="p-4 border-t border-border flex gap-2 items-center">
-                <EmojiPicker
-                  onEmojiSelect={(emoji) => {
-                    setMessageInput((prev) => prev + emoji);
-                    inputRef.current?.focus();
-                  }}
-                  disabled={!isConnected || isSending}
-                />
-                <Input
-                  ref={inputRef}
-                  placeholder="Type a message..."
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  disabled={!isConnected || isSending}
-                  autoFocus
-                />
-                <Button
-                  size="icon"
-                  onClick={handleSendMessage}
-                  disabled={!messageInput.trim() || !isConnected || isSending}
-                  title="Send message"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
+              <div className="border-t border-border">
+                {/* Media Preview */}
+                {showMediaPreview && selectedMedia && (
+                  <div className="p-3 bg-muted/50 border-b border-border">
+                    <div className="flex items-center gap-3">
+                      {mediaPreview ? (
+                        <img
+                          src={mediaPreview}
+                          alt="Preview"
+                          className="w-16 h-16 object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
+                          <FileIcon className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {selectedMedia.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(selectedMedia.size)}
+                        </p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={cancelMediaSelection}
+                        disabled={isUploading}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {isUploading && (
+                      <div className="mt-2 w-full bg-muted rounded-full h-1.5">
+                        <div
+                          className="bg-primary h-1.5 rounded-full transition-all"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Input Bar */}
+                <div className="p-4 flex gap-2 items-center">
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+                    className="hidden"
+                  />
+                  
+                  {/* Attachment Button */}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!isConnected || isSending || isUploading}
+                    title="Attach file"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </Button>
+                  
+                  <EmojiPicker
+                    onEmojiSelect={(emoji) => {
+                      setMessageInput((prev) => prev + emoji);
+                      inputRef.current?.focus();
+                    }}
+                    disabled={!isConnected || isSending || isUploading}
+                  />
+                  <Input
+                    ref={inputRef}
+                    placeholder={selectedMedia ? "Add a caption..." : "Type a message..."}
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    disabled={!isConnected || isSending || isUploading}
+                    autoFocus
+                  />
+                  <Button
+                    size="icon"
+                    onClick={handleSendMessage}
+                    disabled={(!messageInput.trim() && !selectedMedia) || !isConnected || isSending || isUploading}
+                    title="Send message"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -1454,6 +1740,42 @@ export function MessagesClient() {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Image Lightbox */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm cursor-pointer"
+          onClick={() => setLightboxImage(null)}
+        >
+          <Button
+            size="icon"
+            variant="ghost"
+            className="absolute top-4 right-4 text-white hover:bg-white/20"
+            onClick={() => setLightboxImage(null)}
+          >
+            <X className="w-6 h-6" />
+          </Button>
+          <img
+            src={lightboxImage}
+            alt="Full size"
+            className="max-w-[90vw] max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <a
+            href={lightboxImage}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute bottom-4 right-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button variant="secondary" size="sm">
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </Button>
+          </a>
         </div>
       )}
 
