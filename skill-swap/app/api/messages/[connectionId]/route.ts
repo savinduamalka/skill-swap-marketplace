@@ -132,3 +132,62 @@ export async function GET(
     );
   }
 }
+
+/**
+ * DELETE /api/messages/[connectionId]
+ * Clear all messages in a conversation (delete entire chat history)
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ connectionId: string }> }
+) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = (session.user as any).id;
+    const { connectionId } = await params;
+
+    // Verify that the user is part of this connection
+    const connection = await prisma.connection.findUnique({
+      where: { id: connectionId },
+    });
+
+    if (!connection) {
+      return NextResponse.json(
+        { error: 'Connection not found' },
+        { status: 404 }
+      );
+    }
+
+    if (connection.user1Id !== userId && connection.user2Id !== userId) {
+      return NextResponse.json(
+        { error: 'You are not part of this conversation' },
+        { status: 403 }
+      );
+    }
+
+    // Delete all messages in this conversation
+    const result = await prisma.message.deleteMany({
+      where: {
+        connectionId,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      deletedCount: result.count,
+      message: 'All messages in conversation deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting conversation messages:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete conversation' },
+      { status: 500 }
+    );
+  }
+}
+
