@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MessageSquare, Users, Star, Calendar, Settings, Bookmark } from 'lucide-react';
+import { MessageSquare, Users, Star, Calendar, Settings, Bookmark, History } from 'lucide-react';
 import Link from 'next/link';
 import { UserPostsSection } from './user-posts-section';
+import { CreditTransactionHistoryDialog } from '@/components/credit-transaction-history';
 
 // Profile data type
 interface ProfileData {
@@ -233,13 +234,24 @@ export default function ProfilePage() {
 
           {/* Statistics Overview */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <Card className="p-4 text-center">
+            <Card className="p-4 text-center relative group">
               <p className="text-sm text-muted-foreground mb-1">
                 Credits Balance
               </p>
               <p className="text-2xl font-bold text-secondary">
                 {profile.creditsBalance}
               </p>
+              <div className="mt-2">
+                <CreditTransactionHistoryDialog
+                  currentBalance={profile.creditsBalance}
+                  trigger={
+                    <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                      <History className="w-3 h-3" />
+                      View History
+                    </Button>
+                  }
+                />
+              </div>
             </Card>
             <Card className="p-4 text-center">
               <p className="text-sm text-muted-foreground mb-1">
