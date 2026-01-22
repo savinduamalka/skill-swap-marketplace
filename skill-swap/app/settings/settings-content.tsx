@@ -174,7 +174,6 @@ export function SettingsContent({ user }: SettingsContentProps) {
   const [marketingEmails, setMarketingEmails] = useState(false);
 
   // Privacy settings
-  const [profileVisibility, setProfileVisibility] = useState('public');
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [allowMessages, setAllowMessages] = useState('everyone');
 
@@ -1773,33 +1772,10 @@ export function SettingsContent({ user }: SettingsContentProps) {
           <CardHeader>
             <CardTitle>Privacy Settings</CardTitle>
             <CardDescription>
-              Control your profile visibility and privacy preferences
+              Control your privacy preferences
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label>Profile Visibility</Label>
-              <Select
-                value={profileVisibility}
-                onValueChange={setProfileVisibility}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">
-                    Public - Anyone can view your profile
-                  </SelectItem>
-                  <SelectItem value="connections">
-                    Connections Only - Only your connections can view
-                  </SelectItem>
-                  <SelectItem value="private">
-                    Private - Only you can view your profile
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Separator />
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>Show Online Status</Label>
