@@ -173,6 +173,11 @@ export function MessagesClient() {
   const [showClearChatDialog, setShowClearChatDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Conversation deletion state (from sidebar)
+  const [showDeleteConversationDialog, setShowDeleteConversationDialog] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<{ id: string; userName: string } | null>(null);
+  const [isDeletingConversation, setIsDeletingConversation] = useState(false);
+
   // Fetch conversations on mount
   useEffect(() => {
     fetchConversations();
@@ -837,6 +842,59 @@ export function MessagesClient() {
     }
   };
 
+  // Delete conversation from sidebar (without opening it)
+  const handleDeleteConversationFromSidebar = async () => {
+    if (!conversationToDelete) return;
+
+    setIsDeletingConversation(true);
+    try {
+      const response = await fetch(`/api/messages/${conversationToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete conversation');
+      }
+
+      const result = await response.json();
+
+      // Update the conversation in the list (remove last message info)
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === conversationToDelete.id
+            ? { ...conv, lastMessage: null, unreadCount: 0 }
+            : conv
+        )
+      );
+
+      // If this was the selected conversation, clear it
+      if (selectedConversation?.id === conversationToDelete.id) {
+        setMessages([]);
+      }
+
+      // Notify other user via socket
+      notifyConversationCleared({
+        connectionId: conversationToDelete.id,
+      });
+
+      toast({
+        title: 'Conversation deleted',
+        description: `Chat with ${conversationToDelete.userName} cleared (${result.deletedCount} messages)`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete conversation',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingConversation(false);
+      setShowDeleteConversationDialog(false);
+      setConversationToDelete(null);
+    }
+  };
+
   // Listen for messages deleted by other user
   useEffect(() => {
     const unsubscribeDeleted = onMessagesDeleted((data) => {
@@ -1367,61 +1425,103 @@ export function MessagesClient() {
                       (conv.lastMessage?.content?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
                 )
                 .map((conv) => (
-                <Card
-                  key={conv.id}
-                  className={`p-4 cursor-pointer hover:bg-muted transition ${
-                    selectedConversation?.id === conv.id
-                      ? 'bg-primary/10 border-primary'
-                      : ''
-                  }`}
-                  onClick={() => handleSelectConversation(conv.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <Avatar className="w-12 h-12 shrink-0 relative">
-                      <AvatarImage
-                        src={conv.user.image || ''}
-                        alt={conv.user.name}
-                      />
-                      <AvatarFallback className="text-sm font-bold">
-                        {getInitials(conv.user.name)}
-                      </AvatarFallback>
-                      {/* Online indicator in conversation list */}
-                      <div
-                        className={`absolute bottom-0 right-0 w-2.5 h-2.5 ${getStatusColor(
-                          conv.user.id
-                        )} rounded-full border border-white transition-colors duration-300`}
-                      ></div>
-                    </Avatar>
+                <div key={conv.id} className="relative group">
+                  <Card
+                    className={`p-4 cursor-pointer hover:bg-muted transition ${
+                      selectedConversation?.id === conv.id
+                        ? 'bg-primary/10 border-primary'
+                        : ''
+                    }`}
+                    onClick={() => handleSelectConversation(conv.id)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setConversationToDelete({ id: conv.id, userName: conv.user.name });
+                      setShowDeleteConversationDialog(true);
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar className="w-12 h-12 shrink-0 relative">
+                        <AvatarImage
+                          src={conv.user.image || ''}
+                          alt={conv.user.name}
+                        />
+                        <AvatarFallback className="text-sm font-bold">
+                          {getInitials(conv.user.name)}
+                        </AvatarFallback>
+                        {/* Online indicator in conversation list */}
+                        <div
+                          className={`absolute bottom-0 right-0 w-2.5 h-2.5 ${getStatusColor(
+                            conv.user.id
+                          )} rounded-full border border-white transition-colors duration-300`}
+                        ></div>
+                      </Avatar>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-semibold text-foreground">
-                          {conv.user.name}
-                        </p>
-                        {conv.unreadCount > 0 && (
-                          <Badge variant="destructive">
-                            {conv.unreadCount}
-                          </Badge>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-semibold text-foreground">
+                            {conv.user.name}
+                          </p>
+                          {conv.unreadCount > 0 && (
+                            <Badge variant="destructive">
+                              {conv.unreadCount}
+                            </Badge>
+                          )}
+                        </div>
+                        {conv.lastMessage && (
+                          <>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {conv.lastMessage.mediaType && !conv.lastMessage.content ? (
+                                <span className="flex items-center gap-1">
+                                  {conv.lastMessage.mediaType === 'image' && '📷 Photo'}
+                                  {conv.lastMessage.mediaType === 'video' && '🎥 Video'}
+                                  {conv.lastMessage.mediaType === 'audio' && '🎵 Audio'}
+                                  {conv.lastMessage.mediaType === 'file' && '📎 File'}
+                                </span>
+                              ) : (
+                                conv.lastMessage.content
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(
+                                new Date(conv.lastMessage.createdAt),
+                                {
+                                  addSuffix: true,
+                                }
+                              )}
+                            </p>
+                          </>
                         )}
                       </div>
-                      {conv.lastMessage && (
-                        <>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {conv.lastMessage.content}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(
-                              new Date(conv.lastMessage.createdAt),
-                              {
-                                addSuffix: true,
-                              }
-                            )}
-                          </p>
-                        </>
-                      )}
+
+                      {/* Delete button (visible on hover) */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConversationToDelete({ id: conv.id, userName: conv.user.name });
+                              setShowDeleteConversationDialog(true);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete conversation
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
+                </div>
               ))}
             </div>
           </div>
@@ -2144,6 +2244,51 @@ export function MessagesClient() {
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
               Clear chat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Conversation from Sidebar Dialog */}
+      <AlertDialog open={showDeleteConversationDialog} onOpenChange={setShowDeleteConversationDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-destructive" />
+              Delete conversation?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {conversationToDelete && (
+                <>
+                  Delete all messages in your conversation with{' '}
+                  <span className="font-semibold text-foreground">
+                    {conversationToDelete.userName}
+                  </span>
+                  ? This action cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              disabled={isDeletingConversation}
+              onClick={() => {
+                setConversationToDelete(null);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConversationFromSidebar}
+              disabled={isDeletingConversation}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeletingConversation ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Delete conversation
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

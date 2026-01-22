@@ -38,6 +38,7 @@ export interface Conversation {
     createdAt: Date | string;
     isRead: boolean;
     senderId: string;
+    mediaType?: string | null;
   } | null;
   unreadCount: number;
   updatedAt: Date | string;
