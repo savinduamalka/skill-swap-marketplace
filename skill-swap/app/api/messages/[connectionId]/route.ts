@@ -109,6 +109,12 @@ export async function GET(
         createdAt: msg.createdAt,
         isRead: msg.isRead,
         isOwn: msg.senderId === userId,
+        // Media attachments
+        mediaUrl: msg.mediaUrl,
+        mediaType: msg.mediaType,
+        mediaName: msg.mediaName,
+        mediaSize: msg.mediaSize,
+        mediaThumbnail: msg.mediaThumbnail,
       })),
     });
   } catch (error) {

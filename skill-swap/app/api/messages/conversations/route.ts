@@ -80,6 +80,8 @@ export async function GET(req: NextRequest) {
               createdAt: lastMessage.createdAt,
               isRead: lastMessage.isRead,
               senderId: lastMessage.senderId,
+              // Include media type for preview
+              mediaType: lastMessage.mediaType,
             }
           : null,
         unreadCount,
