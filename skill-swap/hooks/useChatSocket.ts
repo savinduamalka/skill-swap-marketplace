@@ -96,6 +96,14 @@ export const useChatSocket = () => {
   const callEndedCallbacks = useRef<
     Set<(data: { from: string; connectionId: string }) => void>
   >(new Set());
+  
+  // Message deletion callbacks
+  const messagesDeletedCallbacks = useRef<
+    Set<(data: { connectionId: string; messageIds: string[]; deletedBy: string }) => void>
+  >(new Set());
+  const conversationClearedCallbacks = useRef<
+    Set<(data: { connectionId: string; clearedBy: string }) => void>
+  >(new Set());
 
   // ==================== HEARTBEAT MANAGEMENT ====================
   // Send periodic heartbeat to server (keeps connection alive)
@@ -344,6 +352,21 @@ export const useChatSocket = () => {
           callEndedCallbacks.current.forEach((cb) => cb(data));
         }
       );
+
+      // Message deletion events
+      socketRef.current.on(
+        'messages_deleted',
+        (data: { connectionId: string; messageIds: string[]; deletedBy: string }) => {
+          messagesDeletedCallbacks.current.forEach((cb) => cb(data));
+        }
+      );
+
+      socketRef.current.on(
+        'conversation_cleared',
+        (data: { connectionId: string; clearedBy: string }) => {
+          conversationClearedCallbacks.current.forEach((cb) => cb(data));
+        }
+      );
     } catch (err) {
       console.error('Socket Init Error', err);
     }
@@ -559,6 +582,49 @@ export const useChatSocket = () => {
     []
   );
 
+  // ==================== MESSAGE DELETION ====================
+  // Notify other user about deleted messages
+  const notifyMessagesDeleted = useCallback(
+    (payload: { connectionId: string; messageIds: string[] }) => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('delete_messages', payload);
+      }
+    },
+    []
+  );
+
+  // Notify other user about cleared conversation
+  const notifyConversationCleared = useCallback(
+    (payload: { connectionId: string }) => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('clear_conversation', payload);
+      }
+    },
+    []
+  );
+
+  // Subscribe to messages deleted events
+  const onMessagesDeleted = useCallback(
+    (callback: (data: { connectionId: string; messageIds: string[]; deletedBy: string }) => void) => {
+      messagesDeletedCallbacks.current.add(callback);
+      return () => {
+        messagesDeletedCallbacks.current.delete(callback);
+      };
+    },
+    []
+  );
+
+  // Subscribe to conversation cleared events
+  const onConversationCleared = useCallback(
+    (callback: (data: { connectionId: string; clearedBy: string }) => void) => {
+      conversationClearedCallbacks.current.add(callback);
+      return () => {
+        conversationClearedCallbacks.current.delete(callback);
+      };
+    },
+    []
+  );
+
   // Reconnect manually
   const reconnect = useCallback(() => {
     if (!socketRef.current?.connected) {
@@ -588,5 +654,10 @@ export const useChatSocket = () => {
     rejectCall,
     endCall,
     reconnect,
+    // Message deletion
+    notifyMessagesDeleted,
+    notifyConversationCleared,
+    onMessagesDeleted,
+    onConversationCleared,
   };
 };

@@ -374,6 +374,69 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 5. Handle Message Deletion (notify other user in real-time)
+  socket.on('delete_messages', async (payload) => {
+    const { connectionId, messageIds, deletedBy } = payload;
+    console.log('[DELETE_MESSAGES] Received:', { connectionId, messageIds: messageIds?.length, deletedBy });
+
+    try {
+      // Get connection to find the other user
+      const connection = await prisma.connection.findUnique({
+        where: { id: connectionId },
+      });
+
+      if (!connection) {
+        console.log('[DELETE_MESSAGES] Connection not found');
+        return;
+      }
+
+      // Determine the other user
+      const otherUserId = connection.user1Id === userId ? connection.user2Id : connection.user1Id;
+
+      // Notify the other user about deleted messages
+      io.to(otherUserId).emit('messages_deleted', {
+        connectionId,
+        messageIds,
+        deletedBy: userId,
+      });
+
+      console.log('[DELETE_MESSAGES] Notified user:', otherUserId);
+    } catch (error) {
+      console.error('[DELETE_MESSAGES] Error:', error);
+    }
+  });
+
+  // 6. Handle Conversation Clear (notify other user in real-time)
+  socket.on('clear_conversation', async (payload) => {
+    const { connectionId } = payload;
+    console.log('[CLEAR_CONVERSATION] Received:', { connectionId });
+
+    try {
+      // Get connection to find the other user
+      const connection = await prisma.connection.findUnique({
+        where: { id: connectionId },
+      });
+
+      if (!connection) {
+        console.log('[CLEAR_CONVERSATION] Connection not found');
+        return;
+      }
+
+      // Determine the other user
+      const otherUserId = connection.user1Id === userId ? connection.user2Id : connection.user1Id;
+
+      // Notify the other user about cleared conversation
+      io.to(otherUserId).emit('conversation_cleared', {
+        connectionId,
+        clearedBy: userId,
+      });
+
+      console.log('[CLEAR_CONVERSATION] Notified user:', otherUserId);
+    } catch (error) {
+      console.error('[CLEAR_CONVERSATION] Error:', error);
+    }
+  });
+
   // ==================== LIVEKIT CALL SIGNALING ====================
   // Initiate call (notify recipient)
   socket.on('call:initiate', async (payload) => {
