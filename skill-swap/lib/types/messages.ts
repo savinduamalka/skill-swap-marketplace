@@ -4,6 +4,7 @@
  */
 
 export type MessageType = 'text' | 'call_missed' | 'call_declined' | 'call_ended';
+export type MediaType = 'image' | 'video' | 'audio' | 'file';
 
 export interface Message {
   id: string;
@@ -17,6 +18,12 @@ export interface Message {
   messageType?: MessageType;
   callDuration?: number; // Duration in seconds for ended calls
   callType?: 'audio' | 'video';
+  // Media attachments
+  mediaUrl?: string | null;
+  mediaType?: MediaType | null;
+  mediaName?: string | null;
+  mediaSize?: number | null;
+  mediaThumbnail?: string | null;
 }
 
 export interface Conversation {
@@ -54,12 +61,24 @@ export interface SocketMessage {
   receiverId: string;
   isRead: boolean;
   createdAt: string;
+  // Media attachments
+  mediaUrl?: string | null;
+  mediaType?: MediaType | null;
+  mediaName?: string | null;
+  mediaSize?: number | null;
+  mediaThumbnail?: string | null;
 }
 
 export interface SendMessagePayload {
   connectionId: string;
   content: string;
   tempId: string; // For optimistic UI updates
+  // Media attachments
+  mediaUrl?: string;
+  mediaType?: MediaType;
+  mediaName?: string;
+  mediaSize?: number;
+  mediaThumbnail?: string;
 }
 
 export interface MessageSentPayload {

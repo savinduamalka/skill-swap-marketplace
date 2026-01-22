@@ -273,12 +273,18 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 3. Handle Sending Messages
+  // 3. Handle Sending Messages (with media support)
   socket.on('send_message', async (payload) => {
-    // Payload: { connectionId, content, tempId (for optimistic UI) }
-    const { connectionId, content, tempId } = payload;
+    // Payload: { connectionId, content, tempId, mediaUrl?, mediaType?, mediaName?, mediaSize?, mediaThumbnail? }
+    const { connectionId, content, tempId, mediaUrl, mediaType, mediaName, mediaSize, mediaThumbnail } = payload;
 
-    console.log('[SEND_MESSAGE] Received payload:', { connectionId, content: content?.substring(0, 50), tempId, userId });
+    console.log('[SEND_MESSAGE] Received payload:', { 
+      connectionId, 
+      content: content?.substring(0, 50), 
+      tempId, 
+      userId,
+      hasMedia: !!mediaUrl 
+    });
 
     try {
       // VALIDATION: Ensure Connection Exists and is Active
@@ -315,18 +321,24 @@ io.on('connection', (socket) => {
 
       console.log('[SEND_MESSAGE] Creating message for receiver:', receiverId);
 
-      // A. Save to Database
+      // A. Save to Database (with media fields)
       const newMessage = await prisma.message.create({
         data: {
-          content: content,
+          content: content || '',
           senderId: userId,
           receiverId: receiverId,
           connectionId: connectionId,
           isRead: false,
+          // Media fields
+          mediaUrl: mediaUrl || null,
+          mediaType: mediaType || null,
+          mediaName: mediaName || null,
+          mediaSize: mediaSize || null,
+          mediaThumbnail: mediaThumbnail || null,
         },
       });
 
-      console.log('[SEND_MESSAGE] Message saved successfully:', newMessage.id);
+      console.log('[SEND_MESSAGE] Message saved successfully:', newMessage.id, mediaUrl ? '(with media)' : '');
 
       // B. Emit to Receiver (Real-time)
       io.to(receiverId).emit('receive_message', newMessage);
