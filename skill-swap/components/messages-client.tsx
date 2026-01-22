@@ -22,6 +22,23 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Send,
   Search,
   Phone,
@@ -39,6 +56,9 @@ import {
   File as FileIcon,
   Download,
   Loader2,
+  Trash2,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useToast } from '@/hooks/use-toast';
@@ -140,7 +160,18 @@ export function MessagesClient() {
     rejectCall,
     endCall,
     reconnect,
+    notifyMessagesDeleted,
+    notifyConversationCleared,
+    onMessagesDeleted,
+    onConversationCleared,
   } = useChatSocket();
+
+  // Message selection state (WhatsApp-style)
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showClearChatDialog, setShowClearChatDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch conversations on mount
   useEffect(() => {
@@ -668,6 +699,171 @@ export function MessagesClient() {
         return <FileIcon className="w-4 h-4" />;
     }
   };
+
+  // ==================== MESSAGE SELECTION & DELETION (WhatsApp-style) ====================
+  
+  // Toggle selection mode
+  const enterSelectionMode = (messageId: string) => {
+    setIsSelectionMode(true);
+    setSelectedMessageIds(new Set([messageId]));
+  };
+
+  const exitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedMessageIds(new Set());
+  };
+
+  // Toggle message selection
+  const toggleMessageSelection = (messageId: string) => {
+    setSelectedMessageIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId);
+        // Exit selection mode if no messages selected
+        if (newSet.size === 0) {
+          setIsSelectionMode(false);
+        }
+      } else {
+        newSet.add(messageId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select all messages
+  const selectAllMessages = () => {
+    const allIds = new Set(messages.map(m => m.id));
+    setSelectedMessageIds(allIds);
+  };
+
+  // Delete selected messages
+  const handleDeleteSelectedMessages = async (deleteForEveryone: boolean = false) => {
+    if (!selectedConversation || selectedMessageIds.size === 0) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch('/api/messages/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageIds: Array.from(selectedMessageIds),
+          connectionId: selectedConversation.id,
+          deleteForEveryone,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete messages');
+      }
+
+      const result = await response.json();
+
+      // Remove deleted messages from UI
+      setMessages((prev) => prev.filter((m) => !result.deletedIds.includes(m.id)));
+
+      // Notify other user via socket (only for deleteForEveryone)
+      if (deleteForEveryone && result.deletedIds.length > 0) {
+        notifyMessagesDeleted({
+          connectionId: selectedConversation.id,
+          messageIds: result.deletedIds,
+        });
+      }
+
+      toast({
+        title: 'Messages deleted',
+        description: `${result.deletedCount} message${result.deletedCount !== 1 ? 's' : ''} deleted`,
+      });
+
+      // Show warning if some messages couldn't be deleted
+      if (result.notDeletedIds?.length > 0) {
+        toast({
+          title: 'Some messages not deleted',
+          description: 'You can only delete messages you sent for everyone',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Failed to delete messages',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      exitSelectionMode();
+    }
+  };
+
+  // Clear entire conversation
+  const handleClearConversation = async () => {
+    if (!selectedConversation) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/messages/${selectedConversation.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to clear conversation');
+      }
+
+      const result = await response.json();
+
+      // Clear messages from UI
+      setMessages([]);
+
+      // Notify other user via socket
+      notifyConversationCleared({
+        connectionId: selectedConversation.id,
+      });
+
+      toast({
+        title: 'Chat cleared',
+        description: `${result.deletedCount} messages deleted`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Clear failed',
+        description: error instanceof Error ? error.message : 'Failed to clear conversation',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowClearChatDialog(false);
+    }
+  };
+
+  // Listen for messages deleted by other user
+  useEffect(() => {
+    const unsubscribeDeleted = onMessagesDeleted((data) => {
+      if (selectedConversation && data.connectionId === selectedConversation.id) {
+        setMessages((prev) => prev.filter((m) => !data.messageIds.includes(m.id)));
+        toast({
+          title: 'Messages deleted',
+          description: 'Some messages were deleted by the other user',
+        });
+      }
+    });
+
+    const unsubscribeCleared = onConversationCleared((data) => {
+      if (selectedConversation && data.connectionId === selectedConversation.id) {
+        setMessages([]);
+        toast({
+          title: 'Chat cleared',
+          description: 'The conversation was cleared by the other user',
+        });
+      }
+    });
+
+    return () => {
+      unsubscribeDeleted();
+      unsubscribeCleared();
+    };
+  }, [selectedConversation, onMessagesDeleted, onConversationCleared, toast]);
 
   const handleSendMessage = () => {
     // If there's media selected, use media send flow
@@ -1236,7 +1432,48 @@ export function MessagesClient() {
               className="flex-1 flex flex-col md:border-l md:border-border"
               onClick={handleChatAreaClick}
             >
-              {/* Chat Header */}
+              {/* Selection Mode Header (WhatsApp-style) */}
+              {isSelectionMode ? (
+                <div className="flex items-center justify-between p-4 border-b border-border bg-primary/10">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={exitSelectionMode}
+                      title="Cancel selection"
+                    >
+                      <X className="w-5 h-5" />
+                    </Button>
+                    <span className="font-semibold text-lg">
+                      {selectedMessageIds.size} selected
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={selectAllMessages}
+                      title="Select all"
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowDeleteDialog(true)}
+                      disabled={selectedMessageIds.size === 0 || isDeleting}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 mr-2" />
+                      )}
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+              /* Chat Header */
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <Link 
                   href={`/profile/${selectedConversation.otherUser.id}`}
@@ -1302,9 +1539,30 @@ export function MessagesClient() {
                   >
                     <Video className="w-4 h-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" title="More options">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
+                  {/* More options dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="icon" variant="ghost" title="More options">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => setIsSelectionMode(true)}
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Select messages
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setShowClearChatDialog(true)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Clear chat
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   {/* Search in chat */}
                   <Button
                     size="icon"
@@ -1316,6 +1574,7 @@ export function MessagesClient() {
                   </Button>
                 </div>
               </div>
+              )}
 
               {/* In-Chat Search Bar */}
               {showChatSearch && (
@@ -1427,10 +1686,46 @@ export function MessagesClient() {
                             messageRefs.current.set(msg.id, el);
                           }
                         }}
-                        className={`flex transition-all duration-300 ${
+                        className={`flex items-center gap-2 transition-all duration-300 ${
                           msg.messageType ? 'justify-center' : msg.isOwn ? 'justify-end' : 'justify-start'
-                        } ${isCurrentSearchResult ? 'scale-[1.02]' : ''}`}
+                        } ${isCurrentSearchResult ? 'scale-[1.02]' : ''} ${
+                          isSelectionMode && selectedMessageIds.has(msg.id) ? 'bg-primary/10 rounded-lg' : ''
+                        }`}
+                        onContextMenu={(e) => {
+                          if (!msg.messageType) {
+                            e.preventDefault();
+                            if (!isSelectionMode) {
+                              enterSelectionMode(msg.id);
+                            } else {
+                              toggleMessageSelection(msg.id);
+                            }
+                          }
+                        }}
+                        onClick={() => {
+                          if (isSelectionMode && !msg.messageType) {
+                            toggleMessageSelection(msg.id);
+                          }
+                        }}
                       >
+                        {/* Selection Checkbox (WhatsApp-style) */}
+                        {isSelectionMode && !msg.messageType && (
+                          <div 
+                            className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 ${
+                              selectedMessageIds.has(msg.id) 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'border-2 border-muted-foreground/50'
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleMessageSelection(msg.id);
+                            }}
+                          >
+                            {selectedMessageIds.has(msg.id) && (
+                              <Check className="w-4 h-4" />
+                            )}
+                          </div>
+                        )}
+                        
                         {/* Call event messages - centered with special styling */}
                         {msg.messageType ? (
                           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 text-muted-foreground text-sm">
@@ -1450,13 +1745,20 @@ export function MessagesClient() {
                                 : 'bg-muted text-foreground rounded-bl-none'
                             } ${isSearchMatch ? 'ring-2 ring-yellow-400 dark:ring-yellow-500' : ''} ${
                               isCurrentSearchResult ? 'ring-2 ring-primary shadow-lg' : ''
-                            } ${msg.mediaUrl ? 'overflow-hidden' : 'px-4 py-2'}`}
+                            } ${msg.mediaUrl ? 'overflow-hidden' : 'px-4 py-2'} ${
+                              isSelectionMode ? 'pointer-events-none' : ''
+                            }`}
                           >
                             {/* Media Content */}
                             {msg.mediaUrl && msg.mediaType === 'image' && (
                               <div 
-                                className="cursor-pointer"
-                                onClick={() => setLightboxImage(msg.mediaUrl!)}
+                                className="cursor-pointer pointer-events-auto"
+                                onClick={(e) => {
+                                  if (!isSelectionMode) {
+                                    e.stopPropagation();
+                                    setLightboxImage(msg.mediaUrl!);
+                                  }
+                                }}
                               >
                                 <img
                                   src={msg.mediaUrl}
@@ -1471,7 +1773,7 @@ export function MessagesClient() {
                               <video
                                 src={msg.mediaUrl}
                                 controls
-                                className="max-w-full rounded-t-lg"
+                                className="max-w-full rounded-t-lg pointer-events-auto"
                                 style={{ maxHeight: '300px' }}
                               />
                             )}
@@ -1778,6 +2080,74 @@ export function MessagesClient() {
           </a>
         </div>
       )}
+
+      {/* Delete Messages Confirmation Dialog (WhatsApp-style) */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete messages?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedMessageIds.size === 1
+                ? 'Delete this message?'
+                : `Delete ${selectedMessageIds.size} messages?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleDeleteSelectedMessages(false)}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Delete for me
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => handleDeleteSelectedMessages(true)}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Delete for everyone
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear Chat Confirmation Dialog */}
+      <AlertDialog open={showClearChatDialog} onOpenChange={setShowClearChatDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear this chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              All messages in this conversation will be deleted. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearConversation}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Clear chat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <MobileNav />
     </>
