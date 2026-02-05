@@ -298,13 +298,31 @@ io.on('connection', (socket) => {
     // Payload: { connectionId, content, tempId, mediaUrl?, mediaType?, mediaName?, mediaSize?, mediaThumbnail? }
     const { connectionId, content, tempId, mediaUrl, mediaType, mediaName, mediaSize, mediaThumbnail } = payload;
 
-    console.log('[SEND_MESSAGE] Received payload:', { 
-      connectionId, 
-      content: content?.substring(0, 50), 
-      tempId, 
+    console.log('[SEND_MESSAGE] Received payload:', {
+      connectionId,
+      content: content?.substring(0, 50),
+      tempId,
       userId,
-      hasMedia: !!mediaUrl 
+      hasMedia: !!mediaUrl
     });
+
+    // RATE LIMITING (5 messages per second)
+    try {
+      const rateLimitKey = `ratelimit:messages:${userId}`;
+      const currentCount = await pubClient.incr(rateLimitKey);
+
+      if (currentCount === 1) {
+        await pubClient.expire(rateLimitKey, 1);
+      }
+
+      if (currentCount > 5) {
+        console.warn(`[RATE_LIMIT] User ${userId} exceeded message limit`);
+        socket.emit('error', { message: 'You are sending messages too fast. Please wait a moment.' });
+        return;
+      }
+    } catch (err) {
+      console.error('Rate limit error:', err);
+    }
 
     try {
       // VALIDATION: Ensure Connection Exists and is Active
