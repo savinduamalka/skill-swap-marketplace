@@ -8,6 +8,6 @@ export default defineConfig({
     path: '../Skill Swap/prisma/migrations',
   },
   datasource: {
-    url: process.env['DATABASE_URL'],
+    url: process.env['DATABASE_URL'] as string,
   },
 });

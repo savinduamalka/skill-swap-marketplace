@@ -7,6 +7,8 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { Redis } from 'ioredis';
 
 dotenv.config();
 
@@ -25,17 +27,26 @@ const prisma = new PrismaClient({
   log: ['error', 'warn'],
 });
 
-// ==================== ONLINE TRACKING SYSTEM ====================
-// Like WhatsApp Web, Facebook, Discord - Enterprise-grade presence tracking
+// REDIS SETUP
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const pubClient = new Redis(redisUrl);
+const subClient = pubClient.duplicate();
 
-// Track online users: Map<userId, { socketId: string, connectionIds: Set<string>, lastHeartbeat: number }>
-const onlineUsers = new Map<
+// Handle Redis connection errors
+pubClient.on('error', (err: any) => console.error('Redis Pub Client Error', err));
+subClient.on('error', (err: any) => console.error('Redis Sub Client Error', err));
+
+// REDIS KEYS
+const ONLINE_USERS_SET = 'online_users';
+
+// to handle disconnects and heartbeats efficiently.
+const localOnlineUsers = new Map<
   string,
   {
     socketIds: Set<string>;
     lastHeartbeat: number;
-    deviceInfo?: string;
-    ipAddress?: string;
+    deviceInfo: string | undefined;
+    ipAddress: string | undefined;
   }
 >();
 
@@ -49,12 +60,12 @@ const STATUS_CHANGE_DEBOUNCE = 1000; // 1 second
 // Track status change debouncing: Map<userId, lastStatusChangeTime>
 const lastStatusChangeTime = new Map<string, number>();
 
-// Cleanup interval - run every 10 seconds to check for stale connections
+// Cleanup interval - run every 10 seconds to check for stale connections ON THIS SERVER
 const cleanupInterval = setInterval(async () => {
   const now = Date.now();
   const usersToMarkOffline = [];
 
-  for (const [userId, userInfo] of onlineUsers.entries()) {
+  for (const [userId, userInfo] of localOnlineUsers.entries()) {
     const timeSinceHeartbeat = now - userInfo.lastHeartbeat;
 
     // If no heartbeat in OFFLINE_TIMEOUT, mark as offline
@@ -68,6 +79,12 @@ const cleanupInterval = setInterval(async () => {
     await markUserOffline(userId);
   }
 }, 10000);
+
+// Helper: Check if user is online globally (in Redis)
+async function isUserOnline(userId: string): Promise<boolean> {
+  const isMember = await pubClient.sismember(ONLINE_USERS_SET, userId);
+  return isMember === 1;
+}
 
 // Function to safely mark user online with debouncing
 async function markUserOnline(
@@ -84,7 +101,10 @@ async function markUserOnline(
   }
 
   try {
-    // Update user in database
+    // 1. Add to Redis Global Set
+    await pubClient.sadd(ONLINE_USERS_SET, userId);
+
+    // 2. Update user in database
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -101,19 +121,19 @@ async function markUserOnline(
       },
     });
 
-    // Log status change for analytics
+    // 3. Log status change for analytics
     await prisma.userOnlineStatus.create({
       data: {
         userId,
         isOnline: true,
-        deviceInfo,
-        ipAddress,
+        deviceInfo: deviceInfo ?? null,
+        ipAddress: ipAddress ?? null,
       },
     });
 
     lastStatusChangeTime.set(userId, now);
 
-    // Broadcast to all clients (everyone needs to know user is online)
+    // 4. Broadcast to all clients (Redis Adapter handles cross-server broadcast)
     io.emit('user_online_status', {
       userId,
       isOnline: true,
@@ -137,11 +157,14 @@ async function markUserOffline(userId: string) {
     return;
   }
 
-  // Remove from in-memory tracking
-  onlineUsers.delete(userId);
+  // Remove from local tracking
+  localOnlineUsers.delete(userId);
 
   try {
-    // Update user in database
+    // 1. Remove from Redis Global Set
+    await pubClient.srem(ONLINE_USERS_SET, userId);
+
+    // 2. Update user in database
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -152,7 +175,7 @@ async function markUserOffline(userId: string) {
       select: { id: true, name: true, isOnline: true, lastSeenAt: true },
     });
 
-    // Log status change for analytics
+    // 3. Log status change for analytics
     await prisma.userOnlineStatus.create({
       data: {
         userId,
@@ -162,7 +185,7 @@ async function markUserOffline(userId: string) {
 
     lastStatusChangeTime.set(userId, now);
 
-    // Broadcast to all clients
+    // 4. Broadcast to all clients
     io.emit('user_offline_status', {
       userId,
       isOnline: false,
@@ -183,6 +206,7 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  adapter: createAdapter(pubClient, subClient), //REDIS ADAPTER
   // Add ping/pong configuration for WebSocket level heartbeat
   pingInterval: HEARTBEAT_INTERVAL,
   pingTimeout: OFFLINE_TIMEOUT,
@@ -217,42 +241,38 @@ io.on('connection', (socket) => {
   console.log(`[CONNECTION] User connected: ${userId} (${socket.id})`);
 
   // ==================== CONNECTION MANAGEMENT ====================
-  // Track this user with multiple socket connections support
-  if (!onlineUsers.has(userId)) {
-    onlineUsers.set(userId, {
+  // Track this user locally for heartbeat management
+  if (!localOnlineUsers.has(userId)) {
+    localOnlineUsers.set(userId, {
       socketIds: new Set([socket.id]),
       lastHeartbeat: Date.now(),
       deviceInfo,
       ipAddress,
     });
-    // User is coming online for the first time
+    // User is coming online (check with Redis first? No, if they connect here, they are online)
     markUserOnline(userId, deviceInfo, ipAddress);
   } else {
-    // User already has connections, just add this socket
-    const userInfo = onlineUsers.get(userId)!;
+    // User already has connections locally, just add this socket
+    const userInfo = localOnlineUsers.get(userId)!;
     userInfo.socketIds.add(socket.id);
     userInfo.lastHeartbeat = Date.now();
   }
 
   // 1. Join a room specific to this user (for receiving messages and calls)
+  // Redis Adapter ensures io.to(userId) works across servers
   socket.join(userId);
 
   // Broadcast user online status to all connected clients
-  io.emit('user_online_status', {
-    userId,
-    isOnline: true,
-    timestamp: new Date(),
-  });
 
   // 2. Join specific connection rooms
   socket.on('join_chat', (connectionId) => {
     socket.join(connectionId);
   });
 
-  // ==================== HEARTBEAT/PING MECHANISM ====================
-  // Like WhatsApp: client sends heartbeat every 30 seconds
+  //HEARTBEAT/PING MECHANISM  
+  //client sends heartbeat every 30 seconds
   socket.on('heartbeat', () => {
-    const userInfo = onlineUsers.get(userId);
+    const userInfo = localOnlineUsers.get(userId);
     if (userInfo) {
       userInfo.lastHeartbeat = Date.now();
       // Update database with latest heartbeat
@@ -267,7 +287,7 @@ io.on('connection', (socket) => {
 
   // WebSocket-level pong (automatic response to ping)
   socket.on('pong', () => {
-    const userInfo = onlineUsers.get(userId);
+    const userInfo = localOnlineUsers.get(userId);
     if (userInfo) {
       userInfo.lastHeartbeat = Date.now();
     }
@@ -341,6 +361,7 @@ io.on('connection', (socket) => {
       console.log('[SEND_MESSAGE] Message saved successfully:', newMessage.id, mediaUrl ? '(with media)' : '');
 
       // B. Emit to Receiver (Real-time)
+      // This will route to the correct server if the receiver is connected there.
       io.to(receiverId).emit('receive_message', newMessage);
 
       // C. Acknowledge Sender
@@ -446,8 +467,10 @@ io.on('connection', (socket) => {
     );
 
     // Verify receiver is online before routing call
-    const receiverInfo = onlineUsers.get(recipientId);
-    if (!receiverInfo) {
+    // USE REDIS to check presence globally
+    const isReceiverOnline = await isUserOnline(recipientId);
+
+    if (!isReceiverOnline) {
       socket.emit('call:failed', {
         reason: 'Recipient is offline',
         code: 'USER_OFFLINE',
@@ -536,18 +559,29 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    const userInfo = onlineUsers.get(userId);
+    const userInfo = localOnlineUsers.get(userId);
 
     if (userInfo) {
       // Remove this socket from the user's connections
       userInfo.socketIds.delete(socket.id);
 
-      // Only mark as offline if user has no more connections
+      // Only mark as offline if user has no more connections ON THIS SERVER
       if (userInfo.socketIds.size === 0) {
         console.log(
-          `[DISCONNECT] User offline: ${userId} (no more connections)`
+          `[DISCONNECT] User offline LOCALLY: ${userId} (no more connections on this node)`
         );
-        markUserOffline(userId);
+        // CHECK GLOBAL STATUS: Are they connected to any OTHER server
+        // fetchSockets() works across the Redis Adapter
+        io.in(userId).fetchSockets().then((matchingSockets) => {
+          if (matchingSockets.length === 0) {
+            console.log(`[DISCONNECT] User truly offline globally: ${userId}`);
+            markUserOffline(userId);
+          } else {
+            console.log(`[DISCONNECT] User still online on other nodes (${matchingSockets.length} sockets found). Keeping status logic.`);
+          }
+        }).catch(err => {
+          console.error("Error fetching sockets on disconnect:", err);
+        });
       } else {
         console.log(
           `[DISCONNECT] Socket closed but user still online: ${userId} (${userInfo.socketIds.size} connections remain)`
@@ -572,6 +606,7 @@ server.listen(PORT, () => {
   console.log(`📡 Heartbeat interval: ${HEARTBEAT_INTERVAL}ms`);
   console.log(`⏱️  Offline timeout: ${OFFLINE_TIMEOUT}ms`);
   console.log(`🔄 Status debounce: ${STATUS_CHANGE_DEBOUNCE}ms`);
+  console.log(`🔗 Redis Adapter: ENABLED`);
 });
 
 // Cleanup on server shutdown
@@ -581,6 +616,8 @@ process.on('SIGTERM', () => {
   server.close(() => {
     console.log('Server closed');
     prisma.$disconnect();
+    pubClient.quit();
+    subClient.quit();
     process.exit(0);
   });
 });
