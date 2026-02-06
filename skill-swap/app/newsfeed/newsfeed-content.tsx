@@ -1,18 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
-import { formatDistanceToNow } from 'date-fns';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Heart,
-  MessageCircle,
   Image as ImageIcon,
   Video,
   Loader2,
@@ -22,13 +17,15 @@ import {
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { PostComments } from '@/components/post-comments';
-import { PostShare } from '@/components/post-share';
-import { PostActionsMenu } from '@/components/post-actions-menu';
 import { EditPostDialog } from '@/components/edit-post-dialog';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LazyPostCard } from '@/components/lazy-post-card';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import type { NewsfeedPost } from './page';
+
+// Number of posts to fetch per page for infinite scroll
+const POSTS_PER_PAGE = 8;
 
 interface NewsfeedContentProps {
   initialPosts: NewsfeedPost[];
@@ -51,7 +48,6 @@ export function NewsfeedContent({
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [newPostsCount, setNewPostsCount] = useState(0);
   const [showNewPostsAlert, setShowNewPostsAlert] = useState(false);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
   const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Post creation state
@@ -91,7 +87,7 @@ export function NewsfeedContent({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/newsfeed?cursor=${cursor}&limit=12`);
+      const response = await fetch(`/api/newsfeed?cursor=${cursor}&limit=${POSTS_PER_PAGE}`);
       if (!response.ok) throw new Error('Failed to fetch posts');
 
       const data = await response.json();
@@ -114,24 +110,15 @@ export function NewsfeedContent({
   }, [cursor, hasMore, isLoading]);
 
   /**
-   * Set up Intersection Observer for infinite scroll
+   * Set up infinite scroll with custom hook
    */
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoading) {
-          fetchMorePosts();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [fetchMorePosts, hasMore, isLoading]);
+  const { loadMoreRef } = useInfiniteScroll({
+    onLoadMore: fetchMorePosts,
+    hasMore,
+    isLoading,
+    rootMargin: '400px', // Start loading 400px before reaching the end
+    threshold: 0.1,
+  });
 
   /**
    * Auto-refresh for new posts (polling every 30 seconds)
@@ -140,7 +127,7 @@ export function NewsfeedContent({
     const checkForNewPosts = async () => {
       try {
         // Fetch posts from the beginning
-        const response = await fetch('/api/newsfeed?limit=12');
+        const response = await fetch(`/api/newsfeed?limit=${POSTS_PER_PAGE}`);
         if (!response.ok) return;
 
         const data = await response.json();
@@ -182,7 +169,7 @@ export function NewsfeedContent({
    */
   const handleLoadNewPosts = async () => {
     try {
-      const response = await fetch('/api/newsfeed?limit=12');
+      const response = await fetch(`/api/newsfeed?limit=${POSTS_PER_PAGE}`);
       if (!response.ok) throw new Error('Failed to fetch posts');
 
       const data = await response.json();
@@ -400,13 +387,6 @@ export function NewsfeedContent({
     return name[0]?.toUpperCase() || 'U';
   };
 
-  /**
-   * Format post date
-   */
-  const formatDate = (date: Date | string) => {
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
-  };
-
   return (
     <div className="space-y-6">
       {/* New Posts Alert */}
@@ -567,7 +547,7 @@ export function NewsfeedContent({
         )}
       </Card>
 
-      {/* Posts Feed */}
+      {/* Posts Feed with Lazy Loading */}
       {posts.length === 0 && !isLoading ? (
         <Card className="p-12 text-center">
           <div className="text-muted-foreground">
@@ -580,143 +560,25 @@ export function NewsfeedContent({
       ) : (
         <div className="space-y-4">
           {posts.map((post) => (
-            <Card key={post.id} className="overflow-hidden">
-              {/* Post Header */}
-              <div className="p-4 pb-0">
-                <div className="flex items-start justify-between">
-                  <Link
-                    href={`/profile/${post.author.id}`}
-                    className="flex items-center gap-3 hover:opacity-80 transition"
-                  >
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage
-                        src={post.author.image || ''}
-                        alt={post.author.name}
-                      />
-                      <AvatarFallback>
-                        {getUserInitials(post.author.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold text-sm">
-                        {post.author.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(post.createdAt)}
-                      </p>
-                    </div>
-                  </Link>
-                  <PostActionsMenu
-                    postId={post.id}
-                    isAuthor={post.author.id === currentUserId}
-                    isSaved={savedPostIds.has(post.id)}
-                    onEdit={() => handleEditPost(post)}
-                    onDelete={() => handleDeletePost(post.id)}
-                    onSaveToggle={(isSaved) =>
-                      handleSaveToggle(post.id, isSaved)
-                    }
-                  />
-                </div>
-
-                {/* Skills Tags */}
-                {post.author.skills.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {post.author.skills.map((skill) => (
-                      <Badge
-                        key={skill}
-                        variant="secondary"
-                        className="text-xs"
-                      >
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Post Content */}
-              <div className="px-4 py-3">
-                <h3 className="font-semibold text-lg mb-2">{post.title}</h3>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {post.content}
-                </p>
-
-                {/* Hashtags */}
-                {post.hashtags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-3">
-                    {post.hashtags.map((tag) => (
-                      <span key={tag} className="text-primary text-sm">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Post Media */}
-              {post.mediaUrl && (
-                <div className="relative w-full aspect-video bg-muted">
-                  {post.mediaUrl.match(/\.(mp4|webm)$/i) ? (
-                    <video
-                      src={post.mediaUrl}
-                      className="w-full h-full object-cover"
-                      controls
-                    />
-                  ) : (
-                    <Image
-                      src={post.mediaUrl}
-                      alt={post.title}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 100vw, 672px"
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* Post Stats */}
-              <div className="px-4 py-2 flex items-center justify-between text-sm text-muted-foreground border-t border-b">
-                <span>{post.likesCount} likes</span>
-                <span>{post.commentsCount} comments</span>
-              </div>
-
-              {/* Post Actions */}
-              <div className="px-4 py-2 flex items-center justify-between gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`flex-1 ${post.isLiked ? 'text-red-500' : ''}`}
-                  onClick={() => handleLike(post.id)}
-                >
-                  <Heart
-                    className={`h-4 w-4 mr-2 ${post.isLiked ? 'fill-current' : ''}`}
-                  />
-                  <span className="text-xs">Like</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="flex-1">
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  <span className="text-xs">Comment</span>
-                </Button>
-                <PostShare postId={post.id} />
-              </div>
-
-              {/* Comments Section */}
-              <div className="px-4 pb-4">
-                <PostComments
-                  postId={post.id}
-                  initialCommentCount={post.commentsCount}
-                  onCommentAdded={() => {
-                    setPosts((prev) =>
-                      prev.map((p) =>
-                        p.id === post.id
-                          ? { ...p, commentsCount: p.commentsCount + 1 }
-                          : p
-                      )
-                    );
-                  }}
-                />
-              </div>
-            </Card>
+            <LazyPostCard
+              key={post.id}
+              post={post}
+              currentUserId={currentUserId}
+              isSaved={savedPostIds.has(post.id)}
+              onLike={handleLike}
+              onEdit={handleEditPost}
+              onDelete={handleDeletePost}
+              onSaveToggle={handleSaveToggle}
+              onCommentAdded={(postId) => {
+                setPosts((prev) =>
+                  prev.map((p) =>
+                    p.id === postId
+                      ? { ...p, commentsCount: p.commentsCount + 1 }
+                      : p
+                  )
+                );
+              }}
+            />
           ))}
         </div>
       )}
