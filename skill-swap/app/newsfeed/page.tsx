@@ -5,8 +5,11 @@ import { Header } from '@/components/layout/header';
 import { MobileNav } from '@/components/layout/mobile-nav';
 import { NewsfeedContent } from './newsfeed-content';
 
-// Number of posts per page
-const POSTS_PER_PAGE = 12;
+// Number of posts for initial load (reduced for faster first paint)
+const INITIAL_POSTS_COUNT = 6;
+
+// Number of posts per subsequent page
+const POSTS_PER_PAGE = 8;
 
 // Force dynamic rendering for personalized content
 export const dynamic = 'force-dynamic';
@@ -56,14 +59,14 @@ async function getInitialPosts(userId: string): Promise<{
       ...blockedMe.map((b) => b.blockerId),
     ]);
 
-    // Fetch posts
+    // Fetch only initial posts for faster first paint
     const posts = await prisma.newsfeedPost.findMany({
       where: {
         authorId: {
           notIn: Array.from(blockedUserIds),
         },
       },
-      take: POSTS_PER_PAGE + 1,
+      take: INITIAL_POSTS_COUNT + 1,
       orderBy: {
         createdAt: 'desc',
       },
@@ -107,7 +110,7 @@ async function getInitialPosts(userId: string): Promise<{
       },
     });
 
-    const hasMore = posts.length > POSTS_PER_PAGE;
+    const hasMore = posts.length > INITIAL_POSTS_COUNT;
     const postsToReturn = hasMore ? posts.slice(0, -1) : posts;
     const nextCursor = hasMore
       ? postsToReturn[postsToReturn.length - 1]?.id
