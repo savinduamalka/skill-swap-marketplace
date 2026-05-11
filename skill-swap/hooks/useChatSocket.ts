@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { io, Socket } from 'socket.io-client';
 import {
   SocketMessage,
@@ -6,6 +7,7 @@ import {
   MessageSentPayload,
   SocketErrorPayload,
 } from '@/lib/types/messages';
+import type { NotificationSocketPayload } from '@/lib/types/notifications';
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
@@ -30,6 +32,7 @@ export type UserOnlineStatusDetail = UserOnlineStatus & {
 };
 
 export const useChatSocket = () => {
+  const { status } = useSession();
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectAttempts = useRef(0);
@@ -103,6 +106,10 @@ export const useChatSocket = () => {
   >(new Set());
   const conversationClearedCallbacks = useRef<
     Set<(data: { connectionId: string; clearedBy: string }) => void>
+  >(new Set());
+
+  const notificationCallbacks = useRef<
+    Set<(payload: NotificationSocketPayload) => void>
   >(new Set());
 
   // ==================== HEARTBEAT MANAGEMENT ====================
@@ -367,13 +374,23 @@ export const useChatSocket = () => {
           conversationClearedCallbacks.current.forEach((cb) => cb(data));
         }
       );
+
+      // Notification events
+      socketRef.current.on(
+        'notification:new',
+        (payload: NotificationSocketPayload) => {
+          notificationCallbacks.current.forEach((cb) => cb(payload));
+        }
+      );
     } catch (err) {
       console.error('Socket Init Error', err);
     }
   }, []);
 
   useEffect(() => {
-    initSocket();
+    if (status === 'authenticated') {
+      initSocket();
+    }
 
     return () => {
       // Cleanup on unmount
@@ -385,7 +402,7 @@ export const useChatSocket = () => {
         socketRef.current.disconnect();
       }
     };
-  }, [initSocket, stopHeartbeat]);
+  }, [initSocket, status, stopHeartbeat]);
 
   // Join a specific conversation room
   const joinChat = useCallback((connectionId: string) => {
@@ -402,6 +419,13 @@ export const useChatSocket = () => {
       errorCallbacks.current.forEach((cb) =>
         cb({ message: 'Not connected to chat server' })
       );
+    }
+  }, []);
+
+  // Set active conversation for notification suppression
+  const setActiveConversation = useCallback((connectionId: string | null) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('set_active_conversation', { connectionId });
     }
   }, []);
 
@@ -459,6 +483,16 @@ export const useChatSocket = () => {
       messageReadCallbacks.current.add(callback);
       return () => {
         messageReadCallbacks.current.delete(callback);
+      };
+    },
+    []
+  );
+
+  const onNotificationReceived = useCallback(
+    (callback: (payload: NotificationSocketPayload) => void) => {
+      notificationCallbacks.current.add(callback);
+      return () => {
+        notificationCallbacks.current.delete(callback);
       };
     },
     []
@@ -642,7 +676,9 @@ export const useChatSocket = () => {
     onError,
     onUserOnlineStatusChange,
     onMessageRead,
+    onNotificationReceived,
     markMessageAsRead,
+    setActiveConversation,
     onCallIncoming,
     onCallAnswer,
     onCallIceCandidate,

@@ -14,6 +14,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const server = http.createServer(app);
 
@@ -38,6 +39,7 @@ subClient.on('error', (err: any) => console.error('Redis Sub Client Error', err)
 
 // REDIS KEYS
 const ONLINE_USERS_SET = 'online_users';
+const ACTIVE_CONVERSATION_PREFIX = 'active_conversation:';
 
 // to handle disconnects and heartbeats efficiently.
 const localOnlineUsers = new Map<
@@ -212,6 +214,22 @@ const io = new Server(server, {
   pingTimeout: OFFLINE_TIMEOUT,
 });
 
+// Internal API: Emit notification to a user (server-to-server)
+app.post('/internal/notifications', async (req, res) => {
+  const secret = req.headers['x-socket-secret'];
+  if (!secret || secret !== process.env.SOCKET_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { userId, notification } = req.body || {};
+  if (!userId || !notification) {
+    return res.status(400).json({ error: 'Missing userId or notification' });
+  }
+
+  io.to(userId).emit('notification:new', { notification });
+  return res.json({ success: true });
+});
+
 // Middleware: Authenticate the Socket Connection
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -267,6 +285,23 @@ io.on('connection', (socket) => {
   // 2. Join specific connection rooms
   socket.on('join_chat', (connectionId) => {
     socket.join(connectionId);
+  });
+
+  // Track active conversation for notification suppression
+  socket.on('set_active_conversation', async (payload) => {
+    const connectionId = payload?.connectionId as string | null;
+    const key = `${ACTIVE_CONVERSATION_PREFIX}${userId}`;
+
+    try {
+      if (!connectionId) {
+        await pubClient.del(key);
+      } else {
+        // Set a TTL to avoid stale data if client disconnects unexpectedly
+        await pubClient.set(key, connectionId, 'EX', 60 * 60 * 12);
+      }
+    } catch (error) {
+      console.error('Error setting active conversation:', error);
+    }
   });
 
   //HEARTBEAT/PING MECHANISM  
@@ -382,7 +417,45 @@ io.on('connection', (socket) => {
       // This will route to the correct server if the receiver is connected there.
       io.to(receiverId).emit('receive_message', newMessage);
 
-      // C. Acknowledge Sender
+      // C. Create notification if receiver is not actively viewing this conversation
+      try {
+        const activeKey = `${ACTIVE_CONVERSATION_PREFIX}${receiverId}`;
+        const activeConversationId = await pubClient.get(activeKey);
+
+        if (activeConversationId !== connectionId) {
+          const sender = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { fullName: true, name: true },
+          });
+
+          const senderName = sender?.fullName || sender?.name || 'User';
+          const messagePreview = content?.trim()
+            ? content.trim().slice(0, 120)
+            : mediaUrl
+              ? 'Sent an attachment'
+              : 'Sent a message';
+
+          const notification = await prisma.notification.create({
+            data: {
+              userId: receiverId,
+              type: 'MESSAGE',
+              title: `${senderName} sent you a message`,
+              message: messagePreview,
+              relatedUserId: userId,
+              relatedEntityId: connectionId,
+              relatedEntityType: 'connection',
+              isSeen: false,
+              isRead: false,
+            },
+          });
+
+          io.to(receiverId).emit('notification:new', { notification });
+        }
+      } catch (error) {
+        console.error('[SEND_MESSAGE] Notification error:', error);
+      }
+
+      // D. Acknowledge Sender
       socket.emit('message_sent', { tempId, savedMessage: newMessage });
       console.log('[SEND_MESSAGE] Message sent event emitted');
     } catch (error) {
