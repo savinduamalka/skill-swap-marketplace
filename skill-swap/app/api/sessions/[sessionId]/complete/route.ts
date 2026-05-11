@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(
   request: NextRequest,
@@ -146,6 +147,29 @@ export async function POST(
             note: `Session completed: ${sessionRecord.sessionName} - earned ${sessionRecord.sessionCredits} credits`,
           },
         });
+      });
+
+      Promise.all([
+        createNotification({
+          userId: sessionRecord.providerId,
+          type: 'SESSION_COMPLETED',
+          title: 'Skill swap completed',
+          message: `Your session "${sessionRecord.sessionName}" has been completed.`,
+          relatedUserId: sessionRecord.learnerId,
+          relatedEntityId: sessionId,
+          relatedEntityType: 'session',
+        }),
+        createNotification({
+          userId: sessionRecord.learnerId,
+          type: 'SESSION_COMPLETED',
+          title: 'Skill swap completed',
+          message: `Your session "${sessionRecord.sessionName}" has been completed.`,
+          relatedUserId: sessionRecord.providerId,
+          relatedEntityId: sessionId,
+          relatedEntityType: 'session',
+        }),
+      ]).catch((error) => {
+        console.error('Failed to create session completed notifications:', error);
       });
 
       return NextResponse.json({

@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 const SESSION_REQUEST_COST = 5;
 
@@ -232,6 +233,19 @@ export async function POST(request: NextRequest) {
       });
 
       return sessionRequest;
+    });
+
+    const senderName = session.user.name || 'Someone';
+    createNotification({
+      userId: receiverId,
+      type: 'SESSION_REQUEST',
+      title: 'New skill swap proposal',
+      message: `${senderName} proposed a new skill swap: ${sessionName}.`,
+      relatedUserId: senderId,
+      relatedEntityId: result.id,
+      relatedEntityType: 'session_request',
+    }).catch((error) => {
+      console.error('Failed to create session request notification:', error);
     });
 
     return NextResponse.json({

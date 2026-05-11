@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 const CONNECTION_COST = 5;
 
@@ -154,6 +155,19 @@ export async function POST(request: NextRequest) {
       });
 
       return connection;
+    });
+
+    const receiverName = session.user.name || 'Someone';
+    createNotification({
+      userId: senderId,
+      type: 'CONNECTION_ACCEPTED',
+      title: 'Connection accepted',
+      message: `${receiverName} accepted your connection request.`,
+      relatedUserId: receiverId,
+      relatedEntityId: result.id,
+      relatedEntityType: 'connection',
+    }).catch((error) => {
+      console.error('Failed to create connection accepted notification:', error);
     });
 
     return NextResponse.json({

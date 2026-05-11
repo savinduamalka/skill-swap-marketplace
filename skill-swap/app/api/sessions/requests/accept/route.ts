@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 const SESSION_CREDITS = 40;
 
@@ -221,6 +222,19 @@ export async function POST(request: NextRequest) {
       });
 
       return newSession;
+    });
+
+    const receiverName = session.user.name || 'Someone';
+    createNotification({
+      userId: senderId,
+      type: 'SESSION_ACCEPTED',
+      title: 'Skill swap accepted',
+      message: `${receiverName} accepted your skill swap request.`,
+      relatedUserId: receiverId,
+      relatedEntityId: result.id,
+      relatedEntityType: 'session',
+    }).catch((error) => {
+      console.error('Failed to create session accepted notification:', error);
     });
 
     return NextResponse.json({

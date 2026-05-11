@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 const CONNECTION_COST = 5;
 
@@ -184,6 +185,19 @@ export async function POST(request: NextRequest) {
       });
 
       return connectionRequest;
+    });
+
+    const senderName = session.user.name || 'Someone';
+    createNotification({
+      userId: receiverId,
+      type: 'CONNECTION_REQUEST',
+      title: 'New connection request',
+      message: `${senderName} sent you a connection request.`,
+      relatedUserId: senderId,
+      relatedEntityId: result.id,
+      relatedEntityType: 'connection_request',
+    }).catch((error) => {
+      console.error('Failed to create connection request notification:', error);
     });
 
     return NextResponse.json({

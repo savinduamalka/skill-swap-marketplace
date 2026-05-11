@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
   try {
@@ -114,6 +115,19 @@ export async function POST(request: NextRequest) {
       await tx.sessionRequest.delete({
         where: { id: sessionRequest.id },
       });
+    });
+
+    const receiverName = session.user.name || 'Someone';
+    createNotification({
+      userId: senderId,
+      type: 'SESSION_DECLINED',
+      title: 'Skill swap declined',
+      message: `${receiverName} declined your skill swap request.`,
+      relatedUserId: receiverId,
+      relatedEntityId: sessionRequest.id,
+      relatedEntityType: 'session_request',
+    }).catch((error) => {
+      console.error('Failed to create session declined notification:', error);
     });
 
     return NextResponse.json({
