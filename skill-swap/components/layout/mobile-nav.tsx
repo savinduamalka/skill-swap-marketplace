@@ -13,7 +13,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
-import { Home, Search, Plus, MessageSquare, User } from 'lucide-react';
+import { Home, Search, Plus, MessageSquare, Bell, User } from 'lucide-react';
+import { useUnreadMessages } from '@/contexts/unread-messages-context';
+import { useNotifications } from '@/contexts/notifications-context';
 
 // Navigation item type for proper TypeScript inference
 interface NavItem {
@@ -24,17 +26,30 @@ interface NavItem {
   badgeCount?: number;
 }
 
-// Navigation items with their routes and icons
-const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/search', label: 'Search', icon: Search },
-  { href: '/create', label: null, icon: Plus, isAction: true },
-  { href: '/messages', label: 'Chat', icon: MessageSquare, badgeCount: 3 },
-  { href: '/profile', label: 'Profile', icon: User },
-];
-
 export function MobileNav() {
   const pathname = usePathname();
+  const { unreadCount: unreadMessagesCount } = useUnreadMessages();
+  const { unreadCount: unreadNotificationsCount } = useNotifications();
+
+  // Navigation items with their routes and icons
+  const navItems: NavItem[] = [
+    { href: '/dashboard', label: 'Home', icon: Home },
+    { href: '/search', label: 'Search', icon: Search },
+    { href: '/create', label: null, icon: Plus, isAction: true },
+    {
+      href: '/messages',
+      label: 'Chat',
+      icon: MessageSquare,
+      badgeCount: unreadMessagesCount,
+    },
+    {
+      href: '/notifications',
+      label: 'Alerts',
+      icon: Bell,
+      badgeCount: unreadNotificationsCount,
+    },
+    { href: '/profile', label: 'Profile', icon: User },
+  ];
 
   /**
    * Determines if the current path matches or is a child of the given path.
@@ -47,7 +62,7 @@ export function MobileNav() {
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-40">
       <div className="flex items-center justify-around h-16">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const IconComponent = item.icon;
           const isActive = isActivePath(item.href);
 

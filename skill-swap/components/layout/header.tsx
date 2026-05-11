@@ -23,9 +23,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Bell, MessageSquare, User, LogOut, Loader2 } from 'lucide-react';
+import { MessageSquare, User, LogOut, Loader2 } from 'lucide-react';
 import { useWallet } from '@/contexts/wallet-context';
 import { useUnreadMessages } from '@/contexts/unread-messages-context';
+import { NotificationsMenu } from '@/components/notifications/notifications-menu';
 
 // Navigation links for desktop menu
 const NAV_LINKS = [
@@ -35,12 +36,6 @@ const NAV_LINKS = [
   { href: '/connections', label: 'Connections' },
   { href: '/sessions', label: 'Sessions' },
 ] as const;
-
-// Placeholder values for messages/notifications - would be real-time in production
-const MOCK_USER_DATA = {
-  unreadMessages: 3,
-  unreadNotifications: 2,
-} as const;
 
 export function Header() {
   const { data: session } = useSession();
@@ -158,18 +153,8 @@ export function Header() {
                 </Link>
               </Button>
 
-              {/* Notifications Button with Unread Count */}
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5" />
-                {MOCK_USER_DATA.unreadNotifications > 0 && (
-                  <Badge
-                    variant="destructive"
-                    className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs"
-                  >
-                    {MOCK_USER_DATA.unreadNotifications}
-                  </Badge>
-                )}
-              </Button>
+              {/* Notifications Menu */}
+              <NotificationsMenu />
 
               {/* User Account Dropdown Menu */}
               <DropdownMenu>

@@ -63,6 +63,7 @@ import {
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useToast } from '@/hooks/use-toast';
 import { useUnreadMessages } from '@/contexts/unread-messages-context';
+import { useNotifications } from '@/contexts/notifications-context';
 import PrebuiltVideoCall from '@/components/livekit-prebuilt-call';
 import AudioCallInterface from '@/components/livekit-audio-call-interface';
 import { LiveKitCallInterface } from '@/components/livekit-call-interface';
@@ -117,6 +118,7 @@ export function MessagesClient() {
   const { toast } = useToast();
   const { markConversationAsRead, setCurrentOpenConversation } =
     useUnreadMessages();
+  const { markRelatedAsRead } = useNotifications();
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -159,6 +161,7 @@ export function MessagesClient() {
     sendIceCandidate,
     rejectCall,
     endCall,
+    setActiveConversation,
     reconnect,
     notifyMessagesDeleted,
     notifyConversationCleared,
@@ -485,6 +488,15 @@ export function MessagesClient() {
     }
   }, [selectedConversation, isConnected, joinChat]);
 
+  // Sync active conversation for notification suppression
+  useEffect(() => {
+    if (selectedConversation?.id) {
+      setActiveConversation(selectedConversation.id);
+    } else {
+      setActiveConversation(null);
+    }
+  }, [selectedConversation?.id, setActiveConversation]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
@@ -505,8 +517,9 @@ export function MessagesClient() {
   useEffect(() => {
     return () => {
       setCurrentOpenConversation(null);
+      setActiveConversation(null);
     };
-  }, [setCurrentOpenConversation]);
+  }, [setActiveConversation, setCurrentOpenConversation]);
 
   const fetchConversations = async () => {
     try {
@@ -552,6 +565,7 @@ export function MessagesClient() {
 
       // Mark this conversation as read in the unread context
       markConversationAsRead(connectionId);
+      markRelatedAsRead(connectionId, 'MESSAGE');
 
       // Reset unread count for this conversation in local state
       setConversations((prev) =>
