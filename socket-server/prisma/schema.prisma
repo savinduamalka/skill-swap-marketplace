@@ -532,6 +532,7 @@ model Notification {
   relatedUserId         String?
   relatedEntityId       String?
   relatedEntityType     String?   // "connection_request" | "session_request" | "session" | etc.
+  isSeen                Boolean   @default(false)
   isRead                Boolean   @default(false)
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -540,6 +541,7 @@ model Notification {
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([isSeen])
   @@index([isRead])
   @@index([type])
   @@map("notifications")
