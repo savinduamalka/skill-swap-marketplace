@@ -46,8 +46,8 @@ export function MobileNav() {
   // Hide when not authenticated
   if (!session?.user) return null;
 
-  // Hide on auth-related pages
-  if (HIDDEN_ROUTES.some((route) => pathname.startsWith(route))) return null;
+  // Hide on auth-related pages and the root landing page
+  if (pathname === '/' || HIDDEN_ROUTES.some((route) => pathname.startsWith(route))) return null;
 
   // Navigation items 
   const navItems: NavItem[] = [
