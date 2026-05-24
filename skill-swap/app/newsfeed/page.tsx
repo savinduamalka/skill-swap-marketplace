@@ -32,11 +32,26 @@ export interface NewsfeedPost {
   isSaved?: boolean;
 }
 
+export interface NewsfeedSkill {
+  id: string;
+  name: string;
+  description: string;
+  proficiencyLevel: string;
+  teachingFormat: string;
+  createdAt: Date;
+  owner: {
+    id: string;
+    name: string;
+    image: string | null;
+  };
+}
+
 /**
  * Fetch initial posts from the database
  */
 async function getInitialPosts(userId: string): Promise<{
   posts: NewsfeedPost[];
+  recentSkills: NewsfeedSkill[];
   nextCursor: string | null;
   hasMore: boolean;
 }> {
@@ -107,6 +122,45 @@ async function getInitialPosts(userId: string): Promise<{
       },
     });
 
+    // Fetch recent skills (limit to 3 for the initial load)
+    const recentSkillsQuery = await prisma.skill.findMany({
+      where: {
+        isTeaching: true,
+        ownerId: {
+          not: userId,
+          notIn: Array.from(blockedUserIds),
+        },
+      },
+      take: 3,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            fullName: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    const recentSkills: NewsfeedSkill[] = recentSkillsQuery.map(skill => ({
+      id: skill.id,
+      name: skill.name,
+      description: skill.description,
+      proficiencyLevel: skill.proficiencyLevel,
+      teachingFormat: skill.teachingFormat,
+      createdAt: skill.createdAt,
+      owner: {
+        id: skill.owner.id,
+        name: skill.owner.fullName || skill.owner.name || 'Anonymous',
+        image: skill.owner.image,
+      },
+    }));
+
     const hasMore = posts.length > POSTS_PER_PAGE;
     const postsToReturn = hasMore ? posts.slice(0, -1) : posts;
     const nextCursor = hasMore
@@ -137,10 +191,10 @@ async function getInitialPosts(userId: string): Promise<{
       isSaved: post.savedBy.length > 0,
     }));
 
-    return { posts: transformedPosts, nextCursor, hasMore };
+    return { posts: transformedPosts, recentSkills, nextCursor, hasMore };
   } catch (error) {
     console.error('Error fetching newsfeed posts:', error);
-    return { posts: [], nextCursor: null, hasMore: false };
+    return { posts: [], recentSkills: [], nextCursor: null, hasMore: false };
   }
 }
 
@@ -161,6 +215,7 @@ export default async function NewsfeedPage() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
           <NewsfeedContent
             initialPosts={initialData.posts}
+            initialSkills={initialData.recentSkills}
             initialCursor={initialData.nextCursor}
             initialHasMore={initialData.hasMore}
             currentUserId={session.user.id}

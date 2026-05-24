@@ -28,10 +28,12 @@ import { PostActionsMenu } from '@/components/post-actions-menu';
 import { EditPostDialog } from '@/components/edit-post-dialog';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { NewsfeedPost } from './page';
+import { BookOpen, Star, Sparkles } from 'lucide-react';
+import type { NewsfeedPost, NewsfeedSkill } from './page';
 
 interface NewsfeedContentProps {
   initialPosts: NewsfeedPost[];
+  initialSkills?: NewsfeedSkill[];
   initialCursor: string | null;
   initialHasMore: boolean;
   currentUserId: string;
@@ -39,12 +41,14 @@ interface NewsfeedContentProps {
 
 export function NewsfeedContent({
   initialPosts,
+  initialSkills = [],
   initialCursor,
   initialHasMore,
   currentUserId,
 }: NewsfeedContentProps) {
   const { data: session } = useSession();
   const [posts, setPosts] = useState<NewsfeedPost[]>(initialPosts);
+  const [skills, setSkills] = useState<NewsfeedSkill[]>(initialSkills);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [isLoading, setIsLoading] = useState(false);
@@ -96,6 +100,14 @@ export function NewsfeedContent({
 
       const data = await response.json();
       setPosts((prev) => [...prev, ...data.posts]);
+      if (data.recentSkills && data.recentSkills.length > 0) {
+        setSkills((prev) => {
+          // Avoid duplicates by checking IDs
+          const existingIds = new Set(prev.map(s => s.id));
+          const newSkills = data.recentSkills.filter((s: NewsfeedSkill) => !existingIds.has(s.id));
+          return [...prev, ...newSkills];
+        });
+      }
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
       
@@ -579,9 +591,67 @@ export function NewsfeedContent({
         </Card>
       ) : (
         <div className="space-y-4">
-          {posts.map((post) => (
-            <Card key={post.id} className="overflow-hidden">
-              {/* Post Header */}
+          {posts.map((post, index) => {
+            // Determine if we should show a skill here (e.g. every 3 posts)
+            const skillIndex = Math.floor(index / 3);
+            const shouldShowSkill = index > 0 && index % 3 === 0 && skills[skillIndex - 1];
+            const skillToShow = shouldShowSkill ? skills[skillIndex - 1] : null;
+
+            return (
+              <div key={post.id} className="space-y-4">
+                {skillToShow && (
+                  <Card className="overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card">
+                    <div className="p-4 border-b bg-muted/30 flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-primary" />
+                      <span className="font-semibold text-primary">New Skill Listed</span>
+                    </div>
+                    <div className="p-4 pb-0">
+                      <div className="flex items-start justify-between">
+                        <Link
+                          href={`/profile/${skillToShow.owner.id}#skills`}
+                          className="flex items-center gap-3 hover:opacity-80 transition"
+                        >
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage
+                              src={skillToShow.owner.image || ''}
+                              alt={skillToShow.owner.name}
+                            />
+                            <AvatarFallback>
+                              {getUserInitials(skillToShow.owner.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-semibold text-foreground">
+                              {skillToShow.owner.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span>Listed {formatDistanceToNow(new Date(skillToShow.createdAt))} ago</span>
+                            </div>
+                          </div>
+                        </Link>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-xl font-bold mb-2">{skillToShow.name}</h3>
+                      <p className="text-muted-foreground mb-4 line-clamp-3">
+                        {skillToShow.description}
+                      </p>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <Badge variant="secondary">{skillToShow.proficiencyLevel}</Badge>
+                        <Badge variant="outline">{skillToShow.teachingFormat}</Badge>
+                      </div>
+                      <Button asChild className="w-full sm:w-auto" variant="outline">
+                        <Link href={`/profile/${skillToShow.owner.id}#skills`}>
+                          <BookOpen className="w-4 h-4 mr-2" />
+                          View Skill
+                        </Link>
+                      </Button>
+                    </div>
+                  </Card>
+                )}
+                
+                <Card className="overflow-hidden">
+                  {/* Post Header */}
               <div className="p-4 pb-0">
                 <div className="flex items-start justify-between">
                   <Link
@@ -717,7 +787,9 @@ export function NewsfeedContent({
                 />
               </div>
             </Card>
-          ))}
+            </div>
+          );
+        })}
         </div>
       )}
 

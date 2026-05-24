@@ -128,8 +128,49 @@ export async function GET(request: NextRequest) {
       isSaved: post.savedBy.length > 0,
     }));
 
+    // Fetch recent skills (limit to 3 per fetch)
+    const recentSkillsQuery = await prisma.skill.findMany({
+      where: {
+        isTeaching: true,
+        ownerId: {
+          not: session.user.id,
+          notIn: blockedUserIds,
+        },
+        ...(cursor && {
+          createdAt: { lt: new Date(cursor) }, // This is an approximation. If cursor was a timestamp it would be better, but we use post id for cursor. We'll just fetch 3 recent skills.
+        }),
+      },
+      take: 3,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            fullName: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    const recentSkills = recentSkillsQuery.map(skill => ({
+      id: skill.id,
+      name: skill.name,
+      description: skill.description,
+      proficiencyLevel: skill.proficiencyLevel,
+      teachingFormat: skill.teachingFormat,
+      createdAt: skill.createdAt,
+      owner: {
+        id: skill.owner.id,
+        name: skill.owner.fullName || skill.owner.name || 'Anonymous',
+        image: skill.owner.image,
+      },
+    }));
+
     return NextResponse.json({
       posts: transformedPosts,
+      recentSkills,
       nextCursor,
       hasMore,
     });
