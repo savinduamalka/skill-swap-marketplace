@@ -51,6 +51,7 @@ import {
   X,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
   Paperclip,
   Image as ImageIcon,
   File as FileIcon,
@@ -1385,7 +1386,7 @@ export function MessagesClient() {
       <main className="pb-20 md:pb-0">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-200px)] flex flex-col md:flex-row gap-6">
           {/* Conversation List Sidebar */}
-          <div className="hidden md:flex flex-col w-80 border-r border-border">
+          <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 md:border-r border-border`}>
             {/* Connection Status */}
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Messages</h2>
@@ -1589,12 +1590,21 @@ export function MessagesClient() {
               ) : (
               /* Chat Header */
               <div className="flex items-center justify-between p-4 border-b border-border">
-                <Link 
-                  href={`/profile/${selectedConversation.otherUser.id}`}
-                  className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
-                >
-                  <Avatar className="w-12 h-12 relative">
-                    <AvatarImage
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="md:hidden shrink-0 -ml-2" 
+                    onClick={() => setSelectedConversation(null)}
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </Button>
+                  <Link 
+                    href={`/profile/${selectedConversation.otherUser.id}`}
+                    className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+                  >
+                    <Avatar className="w-12 h-12 relative">
+                      <AvatarImage
                       src={selectedConversation.otherUser.image || ''}
                       alt={selectedConversation.otherUser.name}
                     />
@@ -1626,6 +1636,7 @@ export function MessagesClient() {
                     </p>
                   </div>
                 </Link>
+                </div>
                 <div className="flex gap-2">
                   {/* Audio call */}
                   <Button
