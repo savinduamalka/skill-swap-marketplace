@@ -298,6 +298,7 @@ model SessionRequest {
   description           String?   @db.Text
   mode                  String    @default("ONLINE") // "ONLINE" | "PHYSICAL"
   status                String    @default("PENDING") // "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED"
+  isSeen                Boolean   @default(false)
   creditsHeld           Int       @default(5) // Credits for session request
   startDate             DateTime
   endDate               DateTime
@@ -313,6 +314,7 @@ model SessionRequest {
   @@index([senderId])
   @@index([receiverId])
   @@index([status])
+  @@index([isSeen])
   @@map("session_requests")
 }
 

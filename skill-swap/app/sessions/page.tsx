@@ -35,6 +35,7 @@ import {
 import { toast } from "sonner"
 import { CreateSessionRequestDialog } from "@/components/create-session-request-dialog"
 import { useWallet } from "@/contexts/wallet-context"
+import { useNotifications } from "@/contexts/notifications-context"
 
 // Types
 interface User {
@@ -88,6 +89,7 @@ export default function SessionsPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const { refreshWallet } = useWallet()
+  const { refreshUnreadCount } = useNotifications()
 
   // Fetch all data
   const fetchData = useCallback(async () => {
@@ -110,6 +112,13 @@ export default function SessionsPage() {
         const requestsData = await requestsRes.json()
         setSentRequests(requestsData.sentRequests || [])
         setReceivedRequests(requestsData.receivedRequests || [])
+        
+        // Mark session requests as seen and refresh badge
+        if (requestsData.receivedRequests?.length > 0) {
+          fetch("/api/sessions/requests/seen", { method: "PATCH" })
+            .then(() => refreshUnreadCount?.())
+            .catch(console.error)
+        }
       }
     } catch (error) {
       console.error("Error fetching sessions:", error)
@@ -117,7 +126,7 @@ export default function SessionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [refreshUnreadCount])
 
   useEffect(() => {
     fetchData()

@@ -27,6 +27,7 @@ export async function GET() {
         where: {
           receiverId: session.user.id,
           status: 'PENDING',
+          isSeen: false,
         },
       }),
     ]);
