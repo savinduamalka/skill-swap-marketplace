@@ -10,14 +10,28 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const unreadCount = await prisma.notification.count({
-      where: {
-        userId: session.user.id,
-        isSeen: false,
-      },
-    });
+    const [unreadCount, pendingConnections, pendingSessions] = await Promise.all([
+      prisma.notification.count({
+        where: {
+          userId: session.user.id,
+          isSeen: false,
+        },
+      }),
+      prisma.connectionRequest.count({
+        where: {
+          receiverId: session.user.id,
+          status: 'PENDING',
+        },
+      }),
+      prisma.sessionRequest.count({
+        where: {
+          receiverId: session.user.id,
+          status: 'PENDING',
+        },
+      }),
+    ]);
 
-    return NextResponse.json({ unreadCount });
+    return NextResponse.json({ unreadCount, pendingConnections, pendingSessions });
   } catch (error) {
     console.error('Error fetching notification count:', error);
     return NextResponse.json(
