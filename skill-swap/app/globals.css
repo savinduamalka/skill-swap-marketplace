@@ -137,3 +137,55 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ===== Mobile Bottom Navigation Styles ===== */
+
+/* Active pill indicator animation */
+.mobile-nav-active-pill {
+  animation: navPillAppear 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes navPillAppear {
+  from {
+    width: 0;
+    opacity: 0;
+  }
+  to {
+    width: 1.25rem;
+    opacity: 1;
+  }
+}
+
+/* Nav item press feedback */
+.mobile-nav-item {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.mobile-nav-item:active {
+  transform: scale(0.92);
+}
+
+/* Create button press animation */
+.mobile-nav-create-btn {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.mobile-nav-create-btn:active > div {
+  transform: scale(0.88);
+}
+
+/* Safe area padding for notched devices */
+.mobile-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Content padding for pages with bottom nav on mobile */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
