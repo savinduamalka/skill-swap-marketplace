@@ -154,7 +154,7 @@ export default function ProfilePage() {
       <main className="pb-20 md:pb-0">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Profile Header Card */}
-          <Card className="p-8 mb-8">
+          <Card className="p-6 md:p-8 mb-8">
             <div className="flex flex-col md:flex-row items-start gap-6">
               {/* Avatar */}
               {profile.image ? (
@@ -172,8 +172,8 @@ export default function ProfilePage() {
               )}
 
               {/* Profile Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex-1 min-w-0 w-full">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <h1 className="text-3xl font-bold text-foreground">
@@ -205,7 +205,7 @@ export default function ProfilePage() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <Link href="/saved-posts">
                       <Button variant="outline" className="bg-transparent">
                         <Bookmark className="w-4 h-4 mr-2" />
