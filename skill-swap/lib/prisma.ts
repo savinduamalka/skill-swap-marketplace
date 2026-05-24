@@ -12,8 +12,13 @@ function createPrismaClient(): PrismaClient {
   // Create a PostgreSQL connection pool with very conservative limits
   // Supabase free tier has limited connections (~10-15)
   // Using transaction pooler (port 6543) is recommended for production
+  let connectionString = process.env.DATABASE_URL;
+  if (connectionString?.includes('pooler.supabase.com:5432')) {
+    connectionString = connectionString.replace(':5432', ':6543') + '?pgbouncer=true';
+  }
+
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString,
     max: 2, // Keep very low for serverless - each Vercel function gets its own pool
     min: 0, // Allow pool to shrink to 0 when idle
     idleTimeoutMillis: 10000, // Close idle connections after 10 seconds
