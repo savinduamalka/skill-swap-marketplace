@@ -15,6 +15,8 @@ import type { NotificationItem } from '@/lib/types/notifications';
 interface NotificationsContextType {
   notifications: NotificationItem[];
   unreadCount: number;
+  pendingConnections: number;
+  pendingSessions: number;
   isLoading: boolean;
   hasMore: boolean;
   fetchInitial: () => Promise<void>;
@@ -44,6 +46,8 @@ export function NotificationsProvider({
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingConnections, setPendingConnections] = useState(0);
+  const [pendingSessions, setPendingSessions] = useState(0);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const refreshUnreadCount = useCallback(async () => {
@@ -54,6 +58,8 @@ export function NotificationsProvider({
       if (!response.ok) return;
       const data = await response.json();
       setUnreadCount(data.unreadCount ?? 0);
+      setPendingConnections(data.pendingConnections ?? 0);
+      setPendingSessions(data.pendingSessions ?? 0);
     } catch (error) {
       console.error('Error fetching notification count:', error);
     }
@@ -64,6 +70,8 @@ export function NotificationsProvider({
       refreshUnreadCount();
     } else if (status === 'unauthenticated') {
       setUnreadCount(0);
+      setPendingConnections(0);
+      setPendingSessions(0);
       setNotifications([]);
       setCursor(null);
       setHasMore(true);
@@ -202,6 +210,8 @@ export function NotificationsProvider({
     () => ({
       notifications,
       unreadCount,
+      pendingConnections,
+      pendingSessions,
       isLoading,
       hasMore,
       fetchInitial,
@@ -222,6 +232,8 @@ export function NotificationsProvider({
       notifications,
       refreshUnreadCount,
       unreadCount,
+      pendingConnections,
+      pendingSessions,
     ]
   );
 

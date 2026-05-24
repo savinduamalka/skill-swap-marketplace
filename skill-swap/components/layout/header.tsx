@@ -24,16 +24,25 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MessageSquare, User, LogOut, Loader2 } from 'lucide-react';
+
+/**
+ * Formats a badge count for display, capping at 99+ for overflow
+ */
+function formatBadgeCount(count: number): string {
+  if (count > 99) return '99+';
+  return String(count);
+}
 import { useWallet } from '@/contexts/wallet-context';
 import { useUnreadMessages } from '@/contexts/unread-messages-context';
 import { NotificationsMenu } from '@/components/notifications/notifications-menu';
+import { useNotifications } from '@/contexts/notifications-context';
+import { Users } from 'lucide-react';
 
 // Navigation links for desktop menu
 const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/search', label: 'Search Skills' },
   { href: '/newsfeed', label: 'Newsfeed' },
-  { href: '/connections', label: 'Connections' },
   { href: '/sessions', label: 'Sessions' },
 ] as const;
 
@@ -41,6 +50,7 @@ export function Header() {
   const { data: session } = useSession();
   const { wallet, isLoading: walletLoading } = useWallet();
   const { unreadCount } = useUnreadMessages();
+  const { pendingConnections, pendingSessions } = useNotifications();
 
   /**
    * Clear search-related cookies
@@ -108,9 +118,14 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-foreground hover:text-primary transition"
+                className="relative text-sm font-medium text-foreground hover:text-primary transition flex items-center"
               >
                 {link.label}
+                {link.label === 'Sessions' && pendingSessions > 0 && (
+                  <Badge variant="destructive" className="ml-1.5 h-4 min-w-[1rem] px-1 text-[0.65rem] rounded-full flex items-center justify-center">
+                    {formatBadgeCount(pendingSessions)}
+                  </Badge>
+                )}
               </Link>
             ))}
           </nav>
@@ -138,6 +153,21 @@ export function Header() {
                 </Badge>
               </div>
 
+              {/* Connections Button with Unread Count */}
+              <Button variant="ghost" size="icon" className="relative" asChild>
+                <Link href="/connections">
+                  <Users className="w-5 h-5" />
+                  {pendingConnections > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 py-0 flex items-center justify-center text-[0.65rem] font-bold leading-none rounded-full"
+                    >
+                      {formatBadgeCount(pendingConnections)}
+                    </Badge>
+                  )}
+                </Link>
+              </Button>
+
               {/* Messages Button with Unread Count */}
               <Button variant="ghost" size="icon" className="relative" asChild>
                 <Link href="/messages">
@@ -145,9 +175,9 @@ export function Header() {
                   {unreadCount > 0 && (
                     <Badge
                       variant="destructive"
-                      className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs"
+                      className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 py-0 flex items-center justify-center text-[0.65rem] font-bold leading-none rounded-full"
                     >
-                      {unreadCount}
+                      {formatBadgeCount(unreadCount)}
                     </Badge>
                   )}
                 </Link>

@@ -12,6 +12,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useNotifications } from '@/contexts/notifications-context';
 import type { NotificationItem } from '@/lib/types/notifications';
 
+/**
+ * Formats a badge count for display, capping at 99+ for overflow
+ */
+function formatBadgeCount(count: number): string {
+  if (count > 99) return '99+';
+  return String(count);
+}
+
 const EMPTY_STATE = {
   title: 'No notifications',
   message: 'You are all caught up.',
@@ -121,9 +129,9 @@ export function NotificationsMenu() {
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs"
+              className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 py-0 flex items-center justify-center text-[0.65rem] font-bold leading-none rounded-full"
             >
-              {unreadCount}
+              {formatBadgeCount(unreadCount)}
             </Badge>
           )}
         </Button>
