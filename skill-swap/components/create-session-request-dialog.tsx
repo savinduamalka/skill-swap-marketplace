@@ -79,9 +79,43 @@ export function CreateSessionRequestDialog({
   const [sessionName, setSessionName] = useState("")
   const [description, setDescription] = useState("")
   const [receiverId, setReceiverId] = useState("")
+  const [skillId, setSkillId] = useState("")
+  const [receiverSkills, setReceiverSkills] = useState<{id: string, name: string}[]>([])
+  const [skillsLoading, setSkillsLoading] = useState(false)
   const [mode, setMode] = useState<"ONLINE" | "PHYSICAL">("ONLINE")
   const [startDate, setStartDate] = useState<Date | undefined>()
   const [endDate, setEndDate] = useState<Date | undefined>()
+
+  // Fetch receiver skills when receiverId changes
+  useEffect(() => {
+    if (!receiverId) {
+      setReceiverSkills([])
+      setSkillId("")
+      return
+    }
+
+    const fetchSkills = async () => {
+      setSkillsLoading(true)
+      try {
+        const res = await fetch(`/api/users/${receiverId}/skills`)
+        if (res.ok) {
+          const data = await res.json()
+          setReceiverSkills(data.skills || [])
+          if (data.skills?.length > 0) {
+            setSkillId(data.skills[0].id)
+          } else {
+            setSkillId("")
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching receiver skills:", error)
+      } finally {
+        setSkillsLoading(false)
+      }
+    }
+
+    fetchSkills()
+  }, [receiverId])
 
   // Fetch connections when dialog opens
   useEffect(() => {
@@ -114,6 +148,8 @@ export function CreateSessionRequestDialog({
     setSessionName("")
     setDescription("")
     setReceiverId("")
+    setSkillId("")
+    setReceiverSkills([])
     setMode("ONLINE")
     setStartDate(undefined)
     setEndDate(undefined)
@@ -127,6 +163,10 @@ export function CreateSessionRequestDialog({
     }
     if (!receiverId) {
       toast.error("Please select a connection")
+      return
+    }
+    if (!skillId) {
+      toast.error("Please select a skill to learn")
       return
     }
     if (!startDate) {
@@ -143,6 +183,7 @@ export function CreateSessionRequestDialog({
           sessionName: sessionName.trim(),
           description: description.trim() || null,
           receiverId,
+          skillId,
           mode,
           startDate: startDate.toISOString(),
           endDate: endDate?.toISOString() || startDate.toISOString(),
@@ -262,6 +303,43 @@ export function CreateSessionRequestDialog({
             )}
           </div>
 
+          {/* Skill Selector */}
+          <div className="grid gap-2">
+            <Label htmlFor="skill">Skill to Learn *</Label>
+            {skillsLoading ? (
+              <div className="flex items-center gap-2 p-3 border rounded-md">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading skills...</span>
+              </div>
+            ) : !receiverId ? (
+              <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
+                <span className="text-sm text-muted-foreground">
+                  Select a connection first
+                </span>
+              </div>
+            ) : receiverSkills.length === 0 ? (
+              <div className="flex items-center gap-2 p-3 border rounded-md bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+                <AlertCircle className="w-4 h-4 text-amber-600" />
+                <span className="text-sm text-amber-700 dark:text-amber-400">
+                  This user has no skills listed.
+                </span>
+              </div>
+            ) : (
+              <Select value={skillId} onValueChange={setSkillId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a skill" />
+                </SelectTrigger>
+                <SelectContent>
+                  {receiverSkills.map((skill) => (
+                    <SelectItem key={skill.id} value={skill.id}>
+                      {skill.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
           {/* Mode Selection */}
           <div className="grid gap-2">
             <Label>Session Mode *</Label>
@@ -356,7 +434,7 @@ export function CreateSessionRequestDialog({
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={loading || !sessionName || !receiverId || !startDate || connections.length === 0}
+            disabled={loading || !sessionName || !receiverId || !skillId || !startDate || connections.length === 0}
           >
             {loading ? (
               <>

@@ -30,10 +30,12 @@ import {
   XCircle, 
   ArrowRightLeft,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Star
 } from "lucide-react"
 import { toast } from "sonner"
 import { CreateSessionRequestDialog } from "@/components/create-session-request-dialog"
+import { ReviewSessionDialog } from "@/components/review-session-dialog"
 import { useWallet } from "@/contexts/wallet-context"
 import { useNotifications } from "@/contexts/notifications-context"
 
@@ -78,6 +80,7 @@ interface Session {
   createdAt: string
   completedAt: string | null
   cancelledAt: string | null
+  hasReviewed?: boolean
 }
 
 export default function SessionsPage() {
@@ -88,6 +91,7 @@ export default function SessionsPage() {
   const [receivedRequests, setReceivedRequests] = useState<SessionRequest[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [reviewSessionData, setReviewSessionData] = useState<{ id: string, providerName: string, skillName?: string } | null>(null)
   const { refreshWallet } = useWallet()
   const { refreshUnreadCount } = useNotifications()
 
@@ -563,6 +567,30 @@ export default function SessionsPage() {
                 )}
               </div>
             )}
+            
+            {session.status === "COMPLETED" && isLearner && !session.hasReviewed && (
+              <div className="flex flex-col gap-2 mt-4 md:mt-0">
+                <Button 
+                  onClick={() => setReviewSessionData({
+                    id: session.id,
+                    providerName: session.provider.fullName || session.provider.name || 'User',
+                    skillName: session.skill?.name
+                  })}
+                >
+                  <Star className="w-4 h-4 mr-2" />
+                  Leave a Review
+                </Button>
+              </div>
+            )}
+            
+            {session.status === "COMPLETED" && isLearner && session.hasReviewed && (
+              <div className="flex flex-col gap-2 mt-4 md:mt-0">
+                <Button variant="outline" disabled className="w-full">
+                  <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" />
+                  Reviewed
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </Card>
@@ -726,6 +754,18 @@ export default function SessionsPage() {
         onOpenChange={setShowCreateDialog}
         onSuccess={fetchData}
       />
+      
+      {/* Review Session Dialog */}
+      {reviewSessionData && (
+        <ReviewSessionDialog
+          open={!!reviewSessionData}
+          onOpenChange={(open) => !open && setReviewSessionData(null)}
+          sessionId={reviewSessionData.id}
+          providerName={reviewSessionData.providerName}
+          skillName={reviewSessionData.skillName}
+          onSuccess={fetchData}
+        />
+      )}
     </>
   )
 }

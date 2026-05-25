@@ -119,12 +119,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { receiverId, sessionName, description, mode, startDate, endDate } = body;
+    const { receiverId, sessionName, description, mode, startDate, endDate, skillId } = body;
 
     // Validate required fields
-    if (!receiverId || !sessionName || !startDate || !endDate) {
+    if (!receiverId || !sessionName || !startDate || !endDate || !skillId) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields (including skillId)' },
         { status: 400 }
       );
     }
@@ -210,6 +210,7 @@ export async function POST(request: NextRequest) {
         data: {
           senderId,
           receiverId,
+          skillId,
           sessionName,
           description: description || null,
           mode: mode || 'ONLINE',
