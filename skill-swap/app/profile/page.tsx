@@ -11,6 +11,8 @@ import { MessageSquare, Users, Star, Calendar, Settings, Bookmark, History } fro
 import Link from 'next/link';
 import { UserPostsSection } from './user-posts-section';
 import { CreditTransactionHistoryDialog } from '@/components/credit-transaction-history';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 
 // Profile data type
 interface ProfileData {
@@ -47,6 +49,8 @@ interface ProfileData {
     authorName: string;
     authorImage: string | null;
     content: string | null;
+    reply: string | null;
+    repliedAt: string | null;
     rating: number;
     skillName: string;
     createdAt: string;
@@ -73,6 +77,44 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [submittingReply, setSubmittingReply] = useState(false);
+
+  const handleReplySubmit = async (reviewId: string) => {
+    if (!replyText.trim()) return;
+    
+    setSubmittingReply(true);
+    try {
+      const res = await fetch(`/api/reviews/${reviewId}/reply`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reply: replyText }),
+      });
+      
+      if (res.ok) {
+        toast.success('Reply submitted successfully');
+        setProfile(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            testimonials: prev.testimonials.map(t => 
+              t.id === reviewId ? { ...t, reply: replyText, repliedAt: new Date().toISOString() } : t
+            )
+          };
+        });
+        setReplyingTo(null);
+        setReplyText('');
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to submit reply');
+      }
+    } catch (error) {
+      toast.error('An error occurred');
+    } finally {
+      setSubmittingReply(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchProfile() {
@@ -413,6 +455,65 @@ export default function ProfilePage() {
                         <p className="text-xs text-muted-foreground mt-2">
                           For: {testimonial.skillName}
                         </p>
+                        
+                        {/* Reply Section */}
+                        {testimonial.reply ? (
+                          <div className="mt-3 pl-4 border-l-2 border-primary/20 bg-muted/20 p-3 rounded-r-lg">
+                            <p className="text-xs font-semibold mb-1 flex items-center gap-2">
+                              <span>Your Reply</span>
+                              <span className="text-muted-foreground font-normal">
+                                {testimonial.repliedAt ? formatDate(testimonial.repliedAt) : ''}
+                              </span>
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {testimonial.reply}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="mt-3">
+                            {replyingTo === testimonial.id ? (
+                              <div className="space-y-2">
+                                <Textarea 
+                                  placeholder="Write your reply..." 
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  className="min-h-[80px]"
+                                />
+                                <div className="flex gap-2 justify-end">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                      setReplyingTo(null);
+                                      setReplyText('');
+                                    }}
+                                    disabled={submittingReply}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button 
+                                    size="sm"
+                                    onClick={() => handleReplySubmit(testimonial.id)}
+                                    disabled={submittingReply || !replyText.trim()}
+                                  >
+                                    {submittingReply ? 'Submitting...' : 'Submit Reply'}
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => {
+                                  setReplyingTo(testimonial.id);
+                                  setReplyText('');
+                                }}
+                              >
+                                Reply
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

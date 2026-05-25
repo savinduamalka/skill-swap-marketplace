@@ -50,6 +50,8 @@ interface UserProfile {
     id: string;
     rating: number;
     comments: string | null;
+    reply: string | null;
+    repliedAt: Date | null;
     createdAt: Date;
     reviewedBy: {
       id: string;
@@ -152,6 +154,8 @@ async function getUserProfile(userId: string): Promise<UserProfile | null> {
             id: true,
             rating: true,
             comments: true,
+            reply: true,
+            repliedAt: true,
             createdAt: true,
             reviewedBy: {
               select: {
@@ -631,7 +635,7 @@ export default async function UserProfilePage({
                         </div>
 
                         {review.comments && (
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground mt-2">
                             {review.comments}
                           </p>
                         )}
@@ -639,6 +643,20 @@ export default async function UserProfilePage({
                         <p className="text-xs text-muted-foreground mt-1">
                           {formatDate(review.createdAt)}
                         </p>
+                        
+                        {review.reply && (
+                          <div className="mt-3 pl-4 border-l-2 border-primary/20 bg-muted/20 p-3 rounded-r-lg">
+                            <p className="text-xs font-semibold mb-1 flex items-center gap-2">
+                              <span>Provider's Reply</span>
+                              <span className="text-muted-foreground font-normal">
+                                {review.repliedAt ? formatDate(review.repliedAt) : ''}
+                              </span>
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {review.reply}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
