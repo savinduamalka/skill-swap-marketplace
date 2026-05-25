@@ -59,6 +59,12 @@ export async function GET(request: NextRequest) {
             name: true,
           },
         },
+        reviews: {
+          select: {
+            id: true,
+            reviewedByUserId: true,
+          }
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -87,6 +93,7 @@ export async function GET(request: NextRequest) {
         cancelledAt: s.cancelledAt,
         role: isLearner ? 'learner' : 'provider',
         skill: s.skill,
+        hasReviewed: s.reviews.some((r) => r.reviewedByUserId === userId),
         otherUser: {
           id: otherUser.id,
           fullName: otherUser.fullName || otherUser.name || 'User',

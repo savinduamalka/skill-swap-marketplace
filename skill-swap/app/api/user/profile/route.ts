@@ -62,6 +62,8 @@ export async function GET() {
             reliability: true,
             punctuality: true,
             comments: true,
+            reply: true,
+            repliedAt: true,
             createdAt: true,
             reviewedBy: {
               select: {
@@ -194,6 +196,8 @@ export async function GET() {
           review.reviewedBy.fullName || review.reviewedBy.name || 'Anonymous',
         authorImage: review.reviewedBy.image,
         content: review.comments,
+        reply: review.reply,
+        repliedAt: review.repliedAt,
         rating: review.rating,
         skillName: review.skill.name,
         createdAt: review.createdAt,
