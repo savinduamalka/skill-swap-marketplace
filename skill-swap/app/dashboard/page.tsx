@@ -23,8 +23,8 @@ export const metadata = {
   description: 'Your skill exchange dashboard',
 };
 
-// Revalidate every 30 seconds for fresh data
-export const revalidate = 30;
+// Dashboard is user-specific, so it must be dynamically rendered
+export const dynamic = 'force-dynamic';
 
 /**
  * Fetch dashboard data on the server

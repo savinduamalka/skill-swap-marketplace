@@ -573,7 +573,7 @@ export default function SessionsPage() {
                 <Button 
                   onClick={() => setReviewSessionData({
                     id: session.id,
-                    providerName: session.provider.fullName || session.provider.name || 'User',
+                    providerName: session.provider.fullName || 'User',
                     skillName: session.skill?.name
                   })}
                 >
