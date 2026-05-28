@@ -178,49 +178,23 @@ export function ConnectButton({
   // Pending request sent by current user - show Cancel option
   if (status === 'pending' && pendingSentByMe) {
     return (
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="secondary" disabled={isCancelling}>
-            {isCancelling ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Cancelling...
-              </>
-            ) : (
-              <>
-                <Clock className="h-4 w-4 mr-2" />
-                Request Sent
-              </>
-            )}
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Connection Request?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to cancel your connection request to{' '}
-              <span className="font-medium text-foreground">
-                {receiverName}
-              </span>
-              ?
-              <br />
-              <br />
-              The 5 credits held for this request will be refunded to your
-              wallet.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Request</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCancelRequest}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Cancel Request
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Button 
+        variant="secondary" 
+        disabled={isCancelling}
+        onClick={handleCancelRequest}
+      >
+        {isCancelling ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Cancelling...
+          </>
+        ) : (
+          <>
+            <X className="h-4 w-4 mr-2" />
+            Cancel Request
+          </>
+        )}
+      </Button>
     );
   }
 

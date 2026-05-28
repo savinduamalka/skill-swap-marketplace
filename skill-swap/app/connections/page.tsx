@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { MessageSquare, Clock, Users, UserX, Ban } from 'lucide-react';
 import Link from 'next/link';
 import { ConnectionRequestActions } from '@/components/connection-request-actions';
+import { CancelRequestButton } from '@/components/connections/cancel-request-button';
 import { UnblockButton } from '@/components/unblock-button';
 
 export const dynamic = 'force-dynamic';
@@ -564,6 +565,7 @@ export default async function ConnectionsPage() {
                             View Profile
                           </Link>
                         </Button>
+                        <CancelRequestButton receiverId={request.receiver.id} />
                       </div>
                     </div>
                   </Card>
