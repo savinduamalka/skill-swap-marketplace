@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
 
 interface Comment {
   id: string;
@@ -143,17 +144,19 @@ export function PostComments({
                 key={comment.id}
                 className="flex gap-2 pb-2 border-b last:border-0"
               >
-                <Avatar className="w-8 h-8 flex-shrink-0">
-                  <AvatarImage src={comment.commenter.image || undefined} />
-                  <AvatarFallback>
-                    {comment.commenter.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <Link href={`/profile/${comment.commenter.id}`} className="hover:opacity-80 transition">
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarImage src={comment.commenter.image || undefined} />
+                    <AvatarFallback>
+                      {comment.commenter.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </Link>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">
+                    <Link href={`/profile/${comment.commenter.id}`} className="text-sm font-medium hover:underline">
                       {comment.commenter.name}
-                    </span>
+                    </Link>
                     <span className="text-xs text-gray-500">
                       {formatDistanceToNow(new Date(comment.createdAt), {
                         addSuffix: true,

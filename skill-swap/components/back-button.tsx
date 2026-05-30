@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 interface BackButtonProps {
@@ -13,6 +14,10 @@ export function BackButton({
   fallbackLabel = 'Back',
 }: BackButtonProps) {
   const router = useRouter();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const handleBack = () => {
     // Check if there's history to go back to
