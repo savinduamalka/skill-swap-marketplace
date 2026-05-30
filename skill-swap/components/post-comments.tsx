@@ -78,9 +78,25 @@ export function PostComments({
 
       if (response.ok) {
         const data = await response.json();
-        setComments([data, ...comments]); // Add new comment to top
+        
+        let existingComments = comments;
+        // If comments are not expanded and there were already comments, fetch them first
+        if (!isExpanded && commentCount > 0) {
+          try {
+            const fetchRes = await fetch(`/api/newsfeed/${postId}/comments?limit=20`);
+            if (fetchRes.ok) {
+              const fetchData = await fetchRes.json();
+              existingComments = fetchData.comments;
+            }
+          } catch (e) {
+            console.error('Error fetching existing comments:', e);
+          }
+        }
+        
+        setComments([data, ...existingComments]);
         setNewComment('');
         setCommentCount((prev) => prev + 1);
+        setIsExpanded(true);
         onCommentAdded?.();
         inputRef.current?.focus();
       }
