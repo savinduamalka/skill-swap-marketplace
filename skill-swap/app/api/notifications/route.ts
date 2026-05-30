@@ -29,6 +29,23 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Cleanup stale notifications asynchronously (keep latest 50)
+    if (!cursor) {
+      prisma.notification.findMany({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: 'desc' },
+        skip: 50,
+        select: { id: true }
+      }).then((staleNotifs) => {
+        if (staleNotifs.length > 0) {
+          const idsToDelete = staleNotifs.map(n => n.id);
+          prisma.notification.deleteMany({
+            where: { id: { in: idsToDelete } }
+          }).catch(console.error);
+        }
+      }).catch(console.error);
+    }
+
     const hasMore = notifications.length > limit;
     const notificationsToReturn = hasMore
       ? notifications.slice(0, -1)
