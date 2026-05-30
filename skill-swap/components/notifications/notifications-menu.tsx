@@ -158,7 +158,7 @@ export function NotificationsMenu() {
               </div>
             )}
 
-            {!isLoading && !hasNotifications && (
+            {!isLoading && notifications.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-sm font-medium">{EMPTY_STATE.title}</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -178,7 +178,7 @@ export function NotificationsMenu() {
           </div>
         </ScrollArea>
 
-        {hasMore && (
+        {hasMore && notifications.length > 0 && (
           <div className="px-4 py-3 border-t">
             <Button
               variant="ghost"

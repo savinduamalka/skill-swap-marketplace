@@ -90,7 +90,7 @@ export function NotificationsProvider({
   }, [refreshUnreadCount, status]);
 
   const fetchInitial = useCallback(async () => {
-    if (status !== 'authenticated' || isLoading) return;
+    if (status !== 'authenticated' || isLoading || hasLoadedOnce) return;
 
     setIsLoading(true);
     try {
@@ -107,7 +107,7 @@ export function NotificationsProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, status]);
+  }, [isLoading, status, hasLoadedOnce]);
 
   const fetchMore = useCallback(async () => {
     if (status !== 'authenticated' || isLoading || !hasMore || !cursor) return;
