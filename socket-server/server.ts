@@ -549,6 +549,38 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 7. Handle Offer Status Change (notify other user in real-time)
+  socket.on('offer_status_changed', async (payload) => {
+    const { messageId, connectionId, content } = payload;
+    console.log('[OFFER_STATUS_CHANGED] Received:', { messageId, connectionId });
+
+    try {
+      // Get connection to find the other user
+      const connection = await prisma.connection.findUnique({
+        where: { id: connectionId },
+      });
+
+      if (!connection) {
+        console.log('[OFFER_STATUS_CHANGED] Connection not found');
+        return;
+      }
+
+      // Determine the other user
+      const otherUserId = connection.user1Id === userId ? connection.user2Id : connection.user1Id;
+
+      // Notify the other user about updated offer status
+      io.to(otherUserId).emit('offer_status_updated', {
+        messageId,
+        connectionId,
+        content,
+      });
+
+      console.log('[OFFER_STATUS_CHANGED] Notified user:', otherUserId);
+    } catch (error) {
+      console.error('[OFFER_STATUS_CHANGED] Error:', error);
+    }
+  });
+
   // ==================== LIVEKIT CALL SIGNALING ====================
   // Initiate call (notify recipient)
   socket.on('call:initiate', async (payload) => {
