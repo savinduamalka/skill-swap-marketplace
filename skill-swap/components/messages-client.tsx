@@ -60,6 +60,7 @@ import {
   Trash2,
   CheckCircle2,
   Circle,
+  Handshake,
 } from 'lucide-react';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useToast } from '@/hooks/use-toast';
@@ -75,6 +76,9 @@ import type {
   Message,
   ConversationDetails,
 } from '@/lib/types/messages';
+import { CreateOfferDialog } from '@/components/create-offer-dialog';
+import { OfferMessageCard } from '@/components/offer-message-card';
+import { useWallet } from '@/contexts/wallet-context';
 
 export function MessagesClient() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -87,6 +91,8 @@ export function MessagesClient() {
   const [isSending, setIsSending] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false);
+  const { wallet, refreshWallet } = useWallet();
   
   // Media upload state
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
@@ -168,6 +174,8 @@ export function MessagesClient() {
     notifyConversationCleared,
     onMessagesDeleted,
     onConversationCleared,
+    onOfferStatusUpdated,
+    notifyOfferStatusChanged,
   } = useChatSocket();
 
   // Message selection state (WhatsApp-style)
@@ -371,6 +379,11 @@ export function MessagesClient() {
           createdAt: socketMessage.createdAt,
           isRead: socketMessage.isRead,
           isOwn: false,
+          mediaUrl: socketMessage.mediaUrl,
+          mediaType: socketMessage.mediaType,
+          mediaName: socketMessage.mediaName,
+          mediaSize: socketMessage.mediaSize,
+          mediaThumbnail: socketMessage.mediaThumbnail,
         };
 
         setMessages((prev) => {
@@ -415,7 +428,13 @@ export function MessagesClient() {
             ? {
                 ...msg,
                 id: savedMessage.id,
+                content: savedMessage.content,
                 createdAt: savedMessage.createdAt,
+                mediaType: savedMessage.mediaType,
+                mediaUrl: savedMessage.mediaUrl,
+                mediaName: savedMessage.mediaName,
+                mediaSize: savedMessage.mediaSize,
+                mediaThumbnail: savedMessage.mediaThumbnail,
               }
             : msg
         );
@@ -439,6 +458,165 @@ export function MessagesClient() {
 
     return unsubscribe;
   }, [onError, toast]);
+
+  // Listen for offer status updates in real time
+  useEffect(() => {
+    if (!onOfferStatusUpdated) return;
+    const unsubscribe = onOfferStatusUpdated((payload) => {
+      if (selectedConversation?.id === payload.connectionId) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === payload.messageId
+              ? { ...msg, content: payload.content }
+              : msg
+          )
+        );
+      }
+    });
+
+    return unsubscribe;
+  }, [onOfferStatusUpdated, selectedConversation]);
+
+  // Handle offer submission
+  const handleCreateOfferSubmit = (offerData: any) => {
+    if (!selectedConversation || isSending) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const content = JSON.stringify(offerData);
+
+    // Optimistic UI update
+    const tempMessage: Message = {
+      id: tempId,
+      content,
+      senderId: session?.user?.id || 'current-user',
+      senderName: 'You',
+      senderImage: null,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      isOwn: true,
+      mediaType: 'offer',
+    };
+
+    setMessages((prev) => [...prev, tempMessage]);
+    setIsSending(true);
+
+    // Send via socket
+    sendMessage({
+      connectionId: selectedConversation.id,
+      content,
+      tempId,
+      mediaType: 'offer',
+    });
+  };
+
+  // Handle accepting an offer
+  const handleAcceptOffer = async (messageId: string, connectionId: string) => {
+    try {
+      const res = await fetch('/api/messages/offer/accept', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messageId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: 'Failed to Accept Offer',
+          description: data.error || 'Something went wrong',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Update local messages list
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, content: data.message.content }
+            : msg
+        )
+      );
+
+      // Emit socket notification
+      notifyOfferStatusChanged({
+        messageId,
+        connectionId,
+        content: data.message.content,
+      });
+
+      toast({
+        title: 'Offer Accepted!',
+        description: 'Your swap session has been successfully scheduled.',
+      });
+
+      // Refresh wallet
+      refreshWallet();
+    } catch (error) {
+      console.error('Error accepting offer:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not accept the offer. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle declining/withdrawing an offer
+  const handleDeclineOffer = async (
+    messageId: string,
+    connectionId: string,
+    action: 'DECLINE' | 'WITHDRAW'
+  ) => {
+    try {
+      const res = await fetch('/api/messages/offer/decline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messageId, action }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: `Failed to ${action === 'WITHDRAW' ? 'Withdraw' : 'Decline'} Offer`,
+          description: data.error || 'Something went wrong',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Update local messages list
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, content: data.message.content }
+            : msg
+        )
+      );
+
+      // Emit socket notification
+      notifyOfferStatusChanged({
+        messageId,
+        connectionId,
+        content: data.message.content,
+      });
+
+      toast({
+        title: action === 'WITHDRAW' ? 'Offer Withdrawn' : 'Offer Declined',
+        description: action === 'WITHDRAW' ? 'You have successfully withdrawn your offer.' : 'You declined the offer.',
+      });
+    } catch (error) {
+      console.error('Error handling offer action:', error);
+      toast({
+        title: 'Error',
+        description: 'Action failed. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Listen for online status updates (enterprise-grade tracking)
   useEffect(() => {
@@ -1861,6 +2039,17 @@ export function MessagesClient() {
                               })}
                             </span>
                           </div>
+                        ) : msg.mediaType === 'offer' ? (
+                          /* Custom negotiated offer cards */
+                          <OfferMessageCard
+                            msg={msg}
+                            currentUserId={session?.user?.id}
+                            onAccept={() => handleAcceptOffer(msg.id, selectedConversation!.id)}
+                            onDecline={() => handleDeclineOffer(msg.id, selectedConversation!.id, 'DECLINE')}
+                            onWithdraw={() => handleDeclineOffer(msg.id, selectedConversation!.id, 'WITHDRAW')}
+                            isSearchMatch={!!isSearchMatch}
+                            isCurrentSearchResult={!!isCurrentSearchResult}
+                          />
                         ) : (
                           /* Regular text/media messages */
                           <div
@@ -2043,6 +2232,16 @@ export function MessagesClient() {
                     }}
                     disabled={!isConnected || isSending || isUploading}
                   />
+                  
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setIsOfferDialogOpen(true)}
+                    disabled={!isConnected || isSending || isUploading}
+                    title="Send swap offer"
+                  >
+                    <Handshake className="w-4 h-4" />
+                  </Button>
                   <Input
                     ref={inputRef}
                     placeholder={selectedMedia ? "Add a caption..." : "Type a message..."}
@@ -2318,6 +2517,16 @@ export function MessagesClient() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {selectedConversation && (
+        <CreateOfferDialog
+          open={isOfferDialogOpen}
+          onOpenChange={setIsOfferDialogOpen}
+          otherUserId={selectedConversation.otherUser.id}
+          otherUserName={selectedConversation.otherUser.name}
+          onSubmitOffer={handleCreateOfferSubmit}
+        />
+      )}
 
       <MobileNav />
     </>
