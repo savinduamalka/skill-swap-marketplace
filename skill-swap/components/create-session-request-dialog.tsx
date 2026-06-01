@@ -73,7 +73,7 @@ export function CreateSessionRequestDialog({
   const [loading, setLoading] = useState(false)
   const [connectionsLoading, setConnectionsLoading] = useState(true)
   const [connections, setConnections] = useState<Connection[]>([])
-  const { refreshWallet } = useWallet()
+  const { wallet, refreshWallet } = useWallet()
   
   // Form state
   const [sessionName, setSessionName] = useState("")
@@ -85,6 +85,7 @@ export function CreateSessionRequestDialog({
   const [mode, setMode] = useState<"ONLINE" | "PHYSICAL">("ONLINE")
   const [startDate, setStartDate] = useState<Date | undefined>()
   const [endDate, setEndDate] = useState<Date | undefined>()
+  const [agreedCredits, setAgreedCredits] = useState<string | number>(20)
 
   // Fetch receiver skills when receiverId changes
   useEffect(() => {
@@ -153,6 +154,7 @@ export function CreateSessionRequestDialog({
     setMode("ONLINE")
     setStartDate(undefined)
     setEndDate(undefined)
+    setAgreedCredits(20)
   }
 
   const handleSubmit = async () => {
@@ -174,6 +176,20 @@ export function CreateSessionRequestDialog({
       return
     }
 
+    const creditsNum = Number(agreedCredits)
+    if (isNaN(creditsNum) || !Number.isInteger(creditsNum) || creditsNum <= 0) {
+      toast.error("Credits must be a positive integer")
+      return
+    }
+    if (creditsNum < 5) {
+      toast.error("Agreed credits must be at least 5")
+      return
+    }
+    if (wallet && wallet.availableBalance < creditsNum) {
+      toast.error(`Insufficient credits. You proposed ${creditsNum} credits, but your current available balance is ${wallet.availableBalance} credits.`)
+      return
+    }
+
     setLoading(true)
     try {
       const res = await fetch("/api/sessions/requests", {
@@ -187,6 +203,7 @@ export function CreateSessionRequestDialog({
           mode,
           startDate: startDate.toISOString(),
           endDate: endDate?.toISOString() || startDate.toISOString(),
+          agreedCredits: creditsNum,
         }),
       })
 
@@ -237,7 +254,7 @@ export function CreateSessionRequestDialog({
             <CreditCard className="w-5 h-5 text-amber-600" />
             <p className="text-sm text-amber-700 dark:text-amber-400">
               <strong>5 credits</strong> will be deducted to send this request. 
-              If accepted, <strong>40 credits</strong> will be reserved for the session.
+              If accepted, <strong>{agreedCredits || 0} credits</strong> will be reserved for the session.
             </p>
           </div>
 
@@ -286,7 +303,7 @@ export function CreateSessionRequestDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {connections.map((conn) => (
-                    <SelectItem key={conn.id} value={conn.id}>
+                     <SelectItem key={conn.id} value={conn.id}>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">
                           <AvatarImage src={conn.profileImage || undefined} />
@@ -338,6 +355,26 @@ export function CreateSessionRequestDialog({
                 </SelectContent>
               </Select>
             )}
+          </div>
+
+          {/* Negotiated Credits */}
+          <div className="grid gap-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="agreedCredits">Negotiated Credits *</Label>
+              {wallet && (
+                <span className="text-xs text-muted-foreground">
+                  Available: {wallet.availableBalance} credits
+                </span>
+              )}
+            </div>
+            <Input
+              id="agreedCredits"
+              type="number"
+              min={5}
+              placeholder="Enter negotiated amount (min 5)"
+              value={agreedCredits}
+              onChange={(e) => setAgreedCredits(e.target.value === "" ? "" : Number(e.target.value))}
+            />
           </div>
 
           {/* Mode Selection */}

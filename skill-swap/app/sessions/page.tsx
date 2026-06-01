@@ -201,7 +201,7 @@ export default function SessionsPage() {
 
       const data = await res.json()
       if (res.ok) {
-        toast.success("Session request cancelled. 5 credits refunded.")
+        toast.success(`Session request cancelled. ${data.creditsRefunded || 5} credits refunded.`)
         fetchData()
         refreshWallet()
       } else {
