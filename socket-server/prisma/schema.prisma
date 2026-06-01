@@ -297,6 +297,7 @@ model SessionRequest {
   sessionName           String
   status                String    @default("PENDING") // "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED"
   creditsHeld           Int       @default(5) // Credits for session request
+  sessionCredits        Int       @default(20) // Credits for full session
   startDate             DateTime
   endDate               DateTime
   createdAt             DateTime  @default(now())
@@ -325,7 +326,7 @@ model Session {
   startDate             DateTime
   endDate               DateTime
   requestCredits        Int       @default(5) // Credits from session request
-  sessionCredits        Int       @default(40) // Credits for full session
+  sessionCredits        Int       @default(20) // Credits for full session
   createdAt             DateTime  @default(now())
   completedAt           DateTime?
   cancelledAt           DateTime?
