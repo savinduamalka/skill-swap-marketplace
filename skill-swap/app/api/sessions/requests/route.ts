@@ -119,12 +119,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { receiverId, sessionName, description, mode, startDate, endDate, skillId } = body;
+    const { receiverId, sessionName, description, mode, startDate, endDate, skillId, agreedCredits } = body;
 
     // Validate required fields
-    if (!receiverId || !sessionName || !startDate || !endDate || !skillId) {
+    if (!receiverId || !sessionName || !startDate || !endDate || !skillId || agreedCredits === undefined) {
       return NextResponse.json(
-        { error: 'Missing required fields (including skillId)' },
+        { error: 'Missing required fields (including skillId and agreedCredits)' },
+        { status: 400 }
+      );
+    }
+
+    const agreedCreditsNum = Number(agreedCredits);
+    if (isNaN(agreedCreditsNum) || !Number.isInteger(agreedCreditsNum) || agreedCreditsNum <= 0) {
+      return NextResponse.json(
+        { error: 'Agreed credits must be a positive integer' },
+        { status: 400 }
+      );
+    }
+
+    if (agreedCreditsNum < 5) {
+      return NextResponse.json(
+        { error: 'Agreed credits must be at least 5 credits' },
         { status: 400 }
       );
     }
@@ -186,10 +201,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if sender has enough credits
-    if (senderWallet.availableBalance < SESSION_REQUEST_COST) {
+    // Check if sender has enough credits for the proposed session request
+    if (senderWallet.availableBalance < agreedCreditsNum) {
       return NextResponse.json(
-        { error: 'Insufficient credits. You need 5 credits to send a session request.' },
+        {
+          error: `Insufficient credits. You proposed ${agreedCreditsNum} credits, but your current balance is ${senderWallet.availableBalance} credits.`,
+        },
         { status: 400 }
       );
     }
@@ -217,6 +234,7 @@ export async function POST(request: NextRequest) {
           startDate: new Date(startDate),
           endDate: new Date(endDate),
           creditsHeld: SESSION_REQUEST_COST,
+          sessionCredits: agreedCreditsNum,
         },
       });
 

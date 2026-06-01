@@ -14,8 +14,6 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
 
-const SESSION_CREDITS = 40;
-
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -59,6 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const senderId = sessionRequest.senderId;
+    const sessionCreditsVal = sessionRequest.sessionCredits ?? 20;
 
     // Get both wallets
     const senderWallet = await prisma.wallet.findUnique({
@@ -75,10 +74,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if sender has enough credits for the session (40 credits)
-    if (senderWallet.availableBalance < SESSION_CREDITS) {
+    // Check if sender has enough credits for the session
+    if (senderWallet.availableBalance < sessionCreditsVal) {
       return NextResponse.json(
-        { error: 'Sender does not have enough credits for the session (40 credits required)' },
+        { error: `Sender does not have enough credits for the session (${sessionCreditsVal} credits required)` },
         { status: 400 }
       );
     }
@@ -147,12 +146,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 3. Reserve session credits (40) from sender's available to outgoing
+      // 3. Reserve session credits from sender's available to outgoing
       await tx.wallet.update({
         where: { userId: senderId },
         data: {
-          availableBalance: { decrement: SESSION_CREDITS },
-          outgoingBalance: { increment: SESSION_CREDITS },
+          availableBalance: { decrement: sessionCreditsVal },
+          outgoingBalance: { increment: sessionCreditsVal },
         },
       });
 
@@ -184,7 +183,7 @@ export async function POST(request: NextRequest) {
       const sessionCreditsTx = await tx.transaction.create({
         data: {
           walletId: senderWallet.id,
-          amount: -SESSION_CREDITS,
+          amount: -sessionCreditsVal,
           type: 'SESSION_REQUEST_SENT',
           status: 'PENDING',
           relatedUserId: receiverId,
@@ -205,7 +204,7 @@ export async function POST(request: NextRequest) {
           startDate: sessionRequest.startDate,
           endDate: sessionRequest.endDate,
           requestCredits: creditsFromRequest,
-          sessionCredits: SESSION_CREDITS,
+          sessionCredits: sessionCreditsVal,
           status: 'ACTIVE',
         },
       });
@@ -242,7 +241,7 @@ export async function POST(request: NextRequest) {
       message: 'Session request accepted successfully',
       sessionId: result.id,
       creditsReceived: creditsFromRequest,
-      creditsReserved: SESSION_CREDITS,
+      creditsReserved: sessionCreditsVal,
     });
   } catch (error) {
     console.error('Error accepting session request:', error);
