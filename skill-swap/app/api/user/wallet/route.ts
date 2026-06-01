@@ -1,20 +1,15 @@
 /**
  * User Wallet API Route
  *
- * Fetches the current user's wallet balance.
+ * GET - Retrieve wallet details for the currently authenticated user.
  *
- * @fileoverview GET /api/user/wallet
+ * @fileoverview /api/user/wallet
  */
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-export const dynamic = 'force-dynamic';
-
-/**
- * GET - Fetch user's wallet balance
- */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
 
@@ -22,39 +17,28 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const userId = session.user.id;
+
     const wallet = await prisma.wallet.findUnique({
-      where: { userId: session.user.id },
-      select: {
-        availableBalance: true,
-        outgoingBalance: true,
-        incomingBalance: true,
-      },
+      where: { userId },
     });
 
     if (!wallet) {
-      // Create wallet if it doesn't exist (first-time user)
-      const newWallet = await prisma.wallet.create({
-        data: {
-          userId: session.user.id,
-          availableBalance: 100, // Starting balance
-          outgoingBalance: 0,
-          incomingBalance: 0,
-        },
-        select: {
-          availableBalance: true,
-          outgoingBalance: true,
-          incomingBalance: true,
-        },
-      });
-
-      return NextResponse.json({ wallet: newWallet });
+      return NextResponse.json({ error: 'Wallet not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ wallet });
+    return NextResponse.json({
+      wallet: {
+        id: wallet.id,
+        availableBalance: wallet.availableBalance,
+        outgoingBalance: wallet.outgoingBalance,
+        incomingBalance: wallet.incomingBalance,
+      },
+    });
   } catch (error) {
-    console.error('Error fetching wallet:', error);
+    console.error('Error fetching user wallet:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch wallet' },
+      { error: 'Failed to fetch wallet information' },
       { status: 500 }
     );
   }
