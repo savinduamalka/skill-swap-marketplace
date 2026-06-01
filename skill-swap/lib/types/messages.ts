@@ -4,7 +4,7 @@
  */
 
 export type MessageType = 'text' | 'call_missed' | 'call_declined' | 'call_ended';
-export type MediaType = 'image' | 'video' | 'audio' | 'file';
+export type MediaType = 'image' | 'video' | 'audio' | 'file' | 'offer';
 
 export interface Message {
   id: string;

@@ -108,6 +108,17 @@ export const useChatSocket = () => {
     Set<(data: { connectionId: string; clearedBy: string }) => void>
   >(new Set());
 
+  // Offer status callbacks
+  const offerStatusCallbacks = useRef<
+    Set<
+      (data: {
+        messageId: string;
+        connectionId: string;
+        content: string;
+      }) => void
+    >
+  >(new Set());
+
   const notificationCallbacks = useRef<
     Set<(payload: NotificationSocketPayload) => void>
   >(new Set());
@@ -235,13 +246,16 @@ export const useChatSocket = () => {
         }
       });
 
-      // Message events
       socketRef.current.on('receive_message', (message: SocketMessage) => {
         messageCallbacks.current.forEach((cb) => cb(message));
       });
 
       socketRef.current.on('message_sent', (payload: MessageSentPayload) => {
         messageSentCallbacks.current.forEach((cb) => cb(payload));
+      });
+
+      socketRef.current.on('offer_status_updated', (data: { messageId: string; connectionId: string; content: string }) => {
+        offerStatusCallbacks.current.forEach((cb) => cb(data));
       });
 
       socketRef.current.on('error', (error: SocketErrorPayload) => {
@@ -666,6 +680,27 @@ export const useChatSocket = () => {
     }
   }, [initSocket]);
 
+  // Subscribe to offer status updated events
+  const onOfferStatusUpdated = useCallback(
+    (callback: (data: { messageId: string; connectionId: string; content: string }) => void) => {
+      offerStatusCallbacks.current.add(callback);
+      return () => {
+        offerStatusCallbacks.current.delete(callback);
+      };
+    },
+    []
+  );
+
+  // Notify other users about changed offer status
+  const notifyOfferStatusChanged = useCallback(
+    (payload: { messageId: string; connectionId: string; content: string }) => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('offer_status_changed', payload);
+      }
+    },
+    []
+  );
+
   return {
     socket: socketRef.current,
     isConnected,
@@ -695,5 +730,7 @@ export const useChatSocket = () => {
     notifyConversationCleared,
     onMessagesDeleted,
     onConversationCleared,
+    onOfferStatusUpdated,
+    notifyOfferStatusChanged,
   };
 };
