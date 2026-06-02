@@ -189,9 +189,6 @@ export default function LoginPage() {
     }
   };
 
-  /**
-   * Handles forgot password form submission
-   */
   const handleForgotPassword = async () => {
     if (!resetEmail || !/\S+@\S+\.\S+/.test(resetEmail)) {
       toast.error('Please enter a valid email address');
@@ -202,15 +199,28 @@ export default function LoginPage() {
     setResetSuccess(false);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setResetSuccess(true);
-      toast.success('Password reset link sent to your email!');
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: resetEmail }),
+      });
 
-      // Reset form after 3 seconds
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send password reset request');
+      }
+
+      setResetSuccess(true);
+      toast.success(data.message || 'Password reset request processed!');
+
+      // Reset form after 5 seconds
       setTimeout(() => {
         setResetEmail('');
         setResetSuccess(false);
-      }, 3000);
+      }, 5000);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to send reset email.';
