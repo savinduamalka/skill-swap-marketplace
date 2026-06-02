@@ -23,6 +23,7 @@ interface OfferMessageCardProps {
   onAccept: () => Promise<void>;
   onDecline: () => Promise<void>;
   onWithdraw: () => Promise<void>;
+  onCounterOffer?: () => Promise<void>;
   isSearchMatch?: boolean;
   isCurrentSearchResult?: boolean;
 }
@@ -33,6 +34,7 @@ export function OfferMessageCard({
   onAccept,
   onDecline,
   onWithdraw,
+  onCounterOffer,
   isSearchMatch,
   isCurrentSearchResult,
 }: OfferMessageCardProps) {
@@ -189,7 +191,10 @@ export function OfferMessageCard({
 
         {/* Action Buttons / Result Details */}
         {status === 'PENDING' && (
-          <div className="border-t border-border/40 pt-3 flex gap-2 justify-end">
+          <div className={cn(
+            "border-t border-border/40 pt-3 w-full",
+            isOwnOffer ? "flex justify-end gap-2" : "grid grid-cols-3 gap-2"
+          )}>
             {isOwnOffer ? (
               <Button
                 size="sm"
@@ -207,32 +212,44 @@ export function OfferMessageCard({
               </Button>
             ) : (
               <>
+                {onCounterOffer && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAction(onCounterOffer)}
+                    disabled={loading}
+                    className="text-xs border-primary text-primary hover:bg-primary/10 hover:text-primary h-8 px-2 rounded-lg w-full flex items-center justify-center"
+                  >
+                    <Handshake className="w-3.5 h-3.5 mr-1" />
+                    <span>Counter</span>
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleAction(onDecline)}
                   disabled={loading}
-                  className="text-xs border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive h-8 px-3 rounded-lg"
+                  className="text-xs border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive h-8 px-2 rounded-lg w-full flex items-center justify-center"
                 >
                   {loading ? (
                     <Loader2 className="w-3.5 h-3.5 mr-1" />
                   ) : (
-                    <XCircle className="w-3.5 h-3.5 mr-1.5" />
+                    <XCircle className="w-3.5 h-3.5 mr-1" />
                   )}
-                  Decline
+                  <span>Decline</span>
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => handleAction(onAccept)}
                   disabled={loading}
-                  className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3 rounded-lg"
+                  className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2 rounded-lg w-full flex items-center justify-center"
                 >
                   {loading ? (
                     <Loader2 className="w-3.5 h-3.5 mr-1" />
                   ) : (
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                   )}
-                  Accept Offer
+                  <span>Accept</span>
                 </Button>
               </>
             )}

@@ -370,10 +370,10 @@ export function CreateSessionRequestDialog({
             <Input
               id="agreedCredits"
               type="number"
-              min={5}
+              min={0}
               placeholder="Enter negotiated amount (min 5)"
               value={agreedCredits}
-              onChange={(e) => setAgreedCredits(e.target.value === "" ? "" : Number(e.target.value))}
+              onChange={(e) => setAgreedCredits(e.target.value === "" ? "" : parseInt(e.target.value) || 0)}
             />
           </div>
 

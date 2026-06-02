@@ -52,6 +52,15 @@ interface CreateOfferDialogProps {
     endDate: string;
     status: 'PENDING';
   }) => void;
+  initialData?: {
+    sessionName: string;
+    description: string;
+    skillId: string;
+    credits: number;
+    mode: 'ONLINE' | 'PHYSICAL';
+    startDate: string;
+    endDate: string;
+  } | null;
 }
 
 interface SkillOption {
@@ -66,6 +75,7 @@ export function CreateOfferDialog({
   otherUserId,
   otherUserName,
   onSubmitOffer,
+  initialData,
 }: CreateOfferDialogProps) {
   const { data: session } = useSession();
   const { wallet, refreshWallet } = useWallet();
@@ -77,7 +87,7 @@ export function CreateOfferDialog({
   const [selectedSkillId, setSelectedSkillId] = useState('');
   const [sessionName, setSessionName] = useState('');
   const [description, setDescription] = useState('');
-  const [credits, setCredits] = useState<number>(20);
+  const [credits, setCredits] = useState<string | number>(20);
   const [mode, setMode] = useState<'ONLINE' | 'PHYSICAL'>('ONLINE');
   
   // Date/Time fields
@@ -121,7 +131,8 @@ export function CreateOfferDialog({
         setSkills(combined);
 
         if (combined.length > 0) {
-          setSelectedSkillId(combined[0].id);
+          const hasMatch = initialData?.skillId && combined.some((s) => s.id === initialData.skillId);
+          setSelectedSkillId(hasMatch ? initialData.skillId : combined[0].id);
         } else {
           setSelectedSkillId('');
         }
@@ -133,14 +144,43 @@ export function CreateOfferDialog({
       }
     };
 
-    // Pre-populate date with tomorrow's date
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    setDate(tomorrow.toISOString().split('T')[0]);
-
     loadSkills();
     refreshWallet();
-  }, [open, session?.user?.id, otherUserId, refreshWallet]);
+  }, [open, session?.user?.id, otherUserId, refreshWallet, initialData]);
+
+  // Pre-populate fields when initialData is provided (e.g. for counter-offers)
+  useEffect(() => {
+    if (!open) return;
+    if (initialData) {
+      setSessionName(initialData.sessionName);
+      setDescription(initialData.description || '');
+      setCredits(initialData.credits);
+      setMode(initialData.mode);
+      if (initialData.skillId) {
+        setSelectedSkillId(initialData.skillId);
+      }
+      try {
+        const start = new Date(initialData.startDate);
+        const end = new Date(initialData.endDate);
+        setDate(start.toISOString().split('T')[0]);
+        setStartTime(start.toTimeString().split(' ')[0].slice(0, 5));
+        setEndTime(end.toTimeString().split(' ')[0].slice(0, 5));
+      } catch (e) {
+        console.error('Error parsing initialData dates:', e);
+      }
+    } else {
+      setSessionName('');
+      setDescription('');
+      setCredits(20);
+      setMode('ONLINE');
+      // Pre-populate date with tomorrow's date
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setDate(tomorrow.toISOString().split('T')[0]);
+      setStartTime('12:00');
+      setEndTime('13:00');
+    }
+  }, [open, initialData]);
 
   const selectedSkill = skills.find((s) => s.id === selectedSkillId);
   const isCurrentUserLearner = selectedSkill ? !selectedSkill.isMySkill : false;
@@ -183,16 +223,21 @@ export function CreateOfferDialog({
       return;
     }
 
-    if (credits < 5) {
+    const creditsNum = Number(credits);
+    if (isNaN(creditsNum) || !Number.isInteger(creditsNum) || creditsNum <= 0) {
+      toast.error('Agreed credits must be a positive integer');
+      return;
+    }
+    if (creditsNum < 5) {
       toast.error('Agreed credits must be at least 5');
       return;
     }
 
     // If current user is the Learner (selected other user's skill), validate balance
-    const requiredCredits = 5 + credits;
+    const requiredCredits = 5 + creditsNum;
     if (isCurrentUserLearner && wallet && wallet.availableBalance < requiredCredits) {
       toast.error(
-        `Insufficient wallet balance. You need ${requiredCredits} credits (5 credits upfront fee + ${credits} credits for the session), but your current available balance is ${wallet.availableBalance} credits.`
+        `Insufficient wallet balance. You need ${requiredCredits} credits (5 credits upfront fee + ${creditsNum} credits for the session), but your current available balance is ${wallet.availableBalance} credits.`
       );
       return;
     }
@@ -326,9 +371,9 @@ export function CreateOfferDialog({
                     <Input
                       id="credits"
                       type="number"
-                      min={5}
+                      min={0}
                       value={credits}
-                      onChange={(e) => setCredits(Math.max(5, parseInt(e.target.value) || 0))}
+                      onChange={(e) => setCredits(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                       className="bg-background border-border text-foreground pr-8"
                     />
                     <CreditCard className="w-4 h-4 text-muted-foreground absolute right-3 top-3" />
@@ -396,7 +441,7 @@ export function CreateOfferDialog({
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-xs text-foreground flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-semibold">Payment Summary:</span> Proposing this teaches you a skill. Accepting will deduct 5 upfront credits + reserve {credits} credits (Total: {5 + credits} credits). Your wallet balance is{' '}
+                    <span className="font-semibold">Payment Summary:</span> Proposing this teaches you a skill. Accepting will deduct 5 upfront credits + reserve {credits} credits (Total: {5 + (Number(credits) || 0)} credits). Your wallet balance is{' '}
                     <span className="font-bold text-primary">{wallet.availableBalance} credits</span>.
                   </div>
                 </div>

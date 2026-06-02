@@ -92,6 +92,8 @@ export function MessagesClient() {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false);
+  const [counterOfferData, setCounterOfferData] = useState<any | null>(null);
+  const [originalOfferMessageId, setOriginalOfferMessageId] = useState<string | null>(null);
   const { wallet, refreshWallet } = useWallet();
   
   // Media upload state
@@ -478,8 +480,13 @@ export function MessagesClient() {
   }, [onOfferStatusUpdated, selectedConversation]);
 
   // Handle offer submission
-  const handleCreateOfferSubmit = (offerData: any) => {
+  const handleCreateOfferSubmit = async (offerData: any) => {
     if (!selectedConversation || isSending) return;
+
+    // If this is a counter offer, decline the original one first (silently)
+    if (originalOfferMessageId) {
+      await handleDeclineOffer(originalOfferMessageId, selectedConversation.id, 'DECLINE', true);
+    }
 
     const tempId = `temp-${Date.now()}`;
     const content = JSON.stringify(offerData);
@@ -507,6 +514,10 @@ export function MessagesClient() {
       tempId,
       mediaType: 'offer',
     });
+
+    // Clear counter offer states
+    setOriginalOfferMessageId(null);
+    setCounterOfferData(null);
   };
 
   // Handle accepting an offer
@@ -567,7 +578,8 @@ export function MessagesClient() {
   const handleDeclineOffer = async (
     messageId: string,
     connectionId: string,
-    action: 'DECLINE' | 'WITHDRAW'
+    action: 'DECLINE' | 'WITHDRAW',
+    silent: boolean = false
   ) => {
     try {
       const res = await fetch('/api/messages/offer/decline', {
@@ -604,10 +616,12 @@ export function MessagesClient() {
         content: data.message.content,
       });
 
-      toast({
-        title: action === 'WITHDRAW' ? 'Offer Withdrawn' : 'Offer Declined',
-        description: action === 'WITHDRAW' ? 'You have successfully withdrawn your offer.' : 'You declined the offer.',
-      });
+      if (!silent) {
+        toast({
+          title: action === 'WITHDRAW' ? 'Offer Withdrawn' : 'Offer Declined',
+          description: action === 'WITHDRAW' ? 'You have successfully withdrawn your offer.' : 'You declined the offer.',
+        });
+      }
     } catch (error) {
       console.error('Error handling offer action:', error);
       toast({
@@ -616,6 +630,13 @@ export function MessagesClient() {
         variant: 'destructive',
       });
     }
+  };
+
+  // Handle counter offer trigger
+  const handleCounterOffer = (messageId: string, offerData: any) => {
+    setOriginalOfferMessageId(messageId);
+    setCounterOfferData(offerData);
+    setIsOfferDialogOpen(true);
   };
 
   // Listen for online status updates (enterprise-grade tracking)
@@ -2047,6 +2068,14 @@ export function MessagesClient() {
                             onAccept={() => handleAcceptOffer(msg.id, selectedConversation!.id)}
                             onDecline={() => handleDeclineOffer(msg.id, selectedConversation!.id, 'DECLINE')}
                             onWithdraw={() => handleDeclineOffer(msg.id, selectedConversation!.id, 'WITHDRAW')}
+                            onCounterOffer={async () => {
+                              try {
+                                const parsedContent = JSON.parse(msg.content);
+                                handleCounterOffer(msg.id, parsedContent);
+                              } catch (e) {
+                                console.error('Failed to parse offer details for counter offer:', e);
+                              }
+                            }}
                             isSearchMatch={!!isSearchMatch}
                             isCurrentSearchResult={!!isCurrentSearchResult}
                           />
@@ -2236,7 +2265,11 @@ export function MessagesClient() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => setIsOfferDialogOpen(true)}
+                    onClick={() => {
+                      setOriginalOfferMessageId(null);
+                      setCounterOfferData(null);
+                      setIsOfferDialogOpen(true);
+                    }}
                     disabled={!isConnected || isSending || isUploading}
                     title="Send swap offer"
                   >
@@ -2521,10 +2554,17 @@ export function MessagesClient() {
       {selectedConversation && (
         <CreateOfferDialog
           open={isOfferDialogOpen}
-          onOpenChange={setIsOfferDialogOpen}
+          onOpenChange={(openVal) => {
+            setIsOfferDialogOpen(openVal);
+            if (!openVal) {
+              setOriginalOfferMessageId(null);
+              setCounterOfferData(null);
+            }
+          }}
           otherUserId={selectedConversation.otherUser.id}
           otherUserName={selectedConversation.otherUser.name}
           onSubmitOffer={handleCreateOfferSubmit}
+          initialData={counterOfferData}
         />
       )}
 
