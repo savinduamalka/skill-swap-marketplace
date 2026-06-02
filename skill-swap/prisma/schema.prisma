@@ -81,6 +81,8 @@ model User {
   name                  String?
   image                 String?
   passwordHash          String?
+  resetPasswordToken    String?   @unique
+  resetPasswordExpires  DateTime?
   bio                   String?
   timeZone              String    @default("UTC")
   isAdmin               Boolean   @default(false)
