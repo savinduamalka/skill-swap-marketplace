@@ -6,7 +6,6 @@ import { signOut } from 'next-auth/react';
 import {
   User,
   Mail,
-  Globe,
   Clock,
   Shield,
   Bell,
@@ -171,11 +170,6 @@ export function SettingsContent({ user }: SettingsContentProps) {
   const [sessionReminders, setSessionReminders] = useState(true);
   const [newMatchNotifications, setNewMatchNotifications] = useState(true);
   const [messageNotifications, setMessageNotifications] = useState(true);
-  const [marketingEmails, setMarketingEmails] = useState(false);
-
-  // Privacy settings
-  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
-  const [allowMessages, setAllowMessages] = useState('everyone');
 
   // Skills I Can Teach modal state
   const [isAddSkillOpen, setIsAddSkillOpen] = useState(false);
@@ -693,7 +687,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
 
   return (
     <Tabs defaultValue="account" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+      <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
         <TabsTrigger value="account" className="flex items-center gap-2">
           <User className="h-4 w-4" />
           <span className="hidden sm:inline">Account</span>
@@ -705,10 +699,6 @@ export function SettingsContent({ user }: SettingsContentProps) {
         <TabsTrigger value="notifications" className="flex items-center gap-2">
           <Bell className="h-4 w-4" />
           <span className="hidden sm:inline">Notifications</span>
-        </TabsTrigger>
-        <TabsTrigger value="privacy" className="flex items-center gap-2">
-          <Shield className="h-4 w-4" />
-          <span className="hidden sm:inline">Privacy</span>
         </TabsTrigger>
         <TabsTrigger value="danger" className="flex items-center gap-2">
           <AlertCircle className="h-4 w-4" />
@@ -1749,78 +1739,6 @@ export function SettingsContent({ user }: SettingsContentProps) {
                 onCheckedChange={setMessageNotifications}
               />
             </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Marketing Emails</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive tips, product updates, and promotional content
-                </p>
-              </div>
-              <Switch
-                checked={marketingEmails}
-                onCheckedChange={setMarketingEmails}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      {/* Privacy Tab */}
-      <TabsContent value="privacy" className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Privacy Settings</CardTitle>
-            <CardDescription>
-              Control your privacy preferences
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Show Online Status</Label>
-                <p className="text-sm text-muted-foreground">
-                  Let others see when you're online
-                </p>
-              </div>
-              <Switch
-                checked={showOnlineStatus}
-                onCheckedChange={setShowOnlineStatus}
-              />
-            </div>
-            <Separator />
-            <div className="space-y-2">
-              <Label>Who Can Message You</Label>
-              <Select value={allowMessages} onValueChange={setAllowMessages}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="everyone">Everyone</SelectItem>
-                  <SelectItem value="connections">Connections Only</SelectItem>
-                  <SelectItem value="none">No One</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Data & Privacy</CardTitle>
-            <CardDescription>
-              Manage your data and download your information
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button variant="outline" className="w-full justify-start">
-              <Globe className="mr-2 h-4 w-4" />
-              Download My Data
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              Download a copy of all your data including profile information,
-              messages, and activity history.
-            </p>
           </CardContent>
         </Card>
       </TabsContent>
