@@ -19,6 +19,10 @@ import {
   Send,
   X,
   RefreshCw,
+  Wallet,
+  Bookmark,
+  User,
+  ShieldCheck,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -29,6 +33,7 @@ import { EditPostDialog } from '@/components/edit-post-dialog';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { BookOpen, Star, Sparkles } from 'lucide-react';
+import { useWallet } from '@/contexts/wallet-context';
 import type { NewsfeedPost, NewsfeedSkill } from './page';
 
 interface NewsfeedContentProps {
@@ -37,6 +42,7 @@ interface NewsfeedContentProps {
   initialCursor: string | null;
   initialHasMore: boolean;
   currentUserId: string;
+  userPostsCount?: number;
 }
 
 export function NewsfeedContent({
@@ -45,8 +51,10 @@ export function NewsfeedContent({
   initialCursor,
   initialHasMore,
   currentUserId,
+  userPostsCount = 0,
 }: NewsfeedContentProps) {
   const { data: session } = useSession();
+  const { wallet, isLoading: walletLoading } = useWallet();
   const [posts, setPosts] = useState<NewsfeedPost[]>(initialPosts);
   const [skills, setSkills] = useState<NewsfeedSkill[]>(initialSkills);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
@@ -420,7 +428,86 @@ export function NewsfeedContent({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* Left Sidebar - Profile Summary & Wallet */}
+      <div className="hidden lg:block lg:col-span-3 space-y-6 sticky top-20">
+        <Card className="overflow-hidden border border-border bg-card">
+          <div className="h-16 bg-gradient-to-r from-primary/10 via-primary/5 to-background border-b border-border/40" />
+          <div className="p-4 pt-0 text-center relative">
+            <div className="-mt-8 mb-3 flex justify-center">
+              <Avatar className="h-16 w-16 border-4 border-card ring-1 ring-border shadow-sm">
+                <AvatarImage src={session?.user?.image || ''} alt="Your avatar" />
+                <AvatarFallback className="text-lg font-bold">
+                  {getUserInitials(session?.user?.name || 'User')}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+            <h3 className="font-semibold text-base text-foreground leading-tight">
+              {session?.user?.name || 'User'}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 truncate">
+              {session?.user?.email}
+            </p>
+
+            <div className="mt-4 pt-4 border-t border-border/60 text-left space-y-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Wallet className="h-3.5 w-3.5 text-primary" />
+                  Available Credits
+                </span>
+                <span className="font-bold text-foreground">
+                  {walletLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : wallet?.availableBalance ?? 0}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <RefreshCw className="h-3 w-3 text-muted-foreground" />
+                  Escrow Outgoing
+                </span>
+                <span className="font-medium text-foreground">
+                  {walletLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : wallet?.outgoingBalance ?? 0}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <RefreshCw className="h-3 w-3 text-muted-foreground" />
+                  Escrow Incoming
+                </span>
+                <span className="font-medium text-foreground">
+                  {walletLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : wallet?.incomingBalance ?? 0}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-border/60 text-left space-y-2">
+              <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground font-normal px-2 h-8" asChild>
+                <Link href="/profile">
+                  <User className="h-3.5 w-3.5 mr-2" />
+                  View Profile
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground font-normal px-2 h-8" asChild>
+                <Link href="/saved-posts">
+                  <Bookmark className="h-3.5 w-3.5 mr-2" />
+                  Saved Posts
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground font-normal px-2 h-8" asChild>
+                <Link href="/profile#posts">
+                  <Send className="h-3.5 w-3.5 mr-2" />
+                  Posts Published
+                  <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0 h-4">
+                    {userPostsCount}
+                  </Badge>
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Center Column - Newsfeed Content */}
+      <div className="col-span-1 lg:col-span-6 space-y-6">
       {/* New Posts Alert */}
       {showNewPostsAlert && (
         <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
@@ -843,6 +930,61 @@ export function NewsfeedContent({
           setDeleteConfirm({ isOpen: false, postId: null, isLoading: false })
         }
       />
+      </div>
+
+      {/* Right Sidebar - Recent Skills & Guidelines */}
+      <div className="hidden lg:block lg:col-span-3 space-y-6 sticky top-20">
+        <Card className="p-4 border border-border bg-card space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-border/60">
+            <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Discover Skills
+            </h3>
+            <Link href="/search" className="text-xs text-primary hover:underline font-medium">
+              View All
+            </Link>
+          </div>
+          {skills.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2">No new skills listed recently.</p>
+          ) : (
+            <div className="space-y-3">
+              {skills.slice(0, 3).map((skill) => (
+                <div key={skill.id} className="space-y-1">
+                  <Link href={`/profile/${skill.owner.id}#skills`} className="group block">
+                    <h4 className="text-xs font-semibold text-foreground group-hover:text-primary transition line-clamp-1">
+                      {skill.name}
+                    </h4>
+                  </Link>
+                  <p className="text-[10px] text-muted-foreground line-clamp-2 leading-relaxed">
+                    {skill.description}
+                  </p>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
+                      by {skill.owner.name}
+                    </span>
+                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
+                      {skill.proficiencyLevel}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-4 border border-border bg-card">
+          <h3 className="font-semibold text-sm text-foreground flex items-center gap-2 mb-2 pb-2 border-b border-border/60">
+            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+            SkillSwap Guidelines
+          </h3>
+          <ul className="text-xs text-muted-foreground space-y-2 list-disc list-inside">
+            <li>Be respectful and constructive in comments.</li>
+            <li>Post topic titles must be clear and descriptive.</li>
+            <li>Use specific hashtags to help others find your skill.</li>
+            <li>Keep exchanges safe using our built-in Escrow.</li>
+          </ul>
+        </Card>
+      </div>
     </div>
   );
 }

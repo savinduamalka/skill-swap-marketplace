@@ -54,6 +54,7 @@ async function getInitialPosts(userId: string): Promise<{
   recentSkills: NewsfeedSkill[];
   nextCursor: string | null;
   hasMore: boolean;
+  userPostsCount: number;
 }> {
   try {
     // Get blocked user IDs (sequential to avoid connection pool exhaustion)
@@ -191,10 +192,15 @@ async function getInitialPosts(userId: string): Promise<{
       isSaved: post.savedBy.length > 0,
     }));
 
-    return { posts: transformedPosts, recentSkills, nextCursor, hasMore };
+    // Count user's own published posts
+    const userPostsCount = await prisma.newsfeedPost.count({
+      where: { authorId: userId },
+    });
+
+    return { posts: transformedPosts, recentSkills, nextCursor, hasMore, userPostsCount };
   } catch (error) {
     console.error('Error fetching newsfeed posts:', error);
-    return { posts: [], recentSkills: [], nextCursor: null, hasMore: false };
+    return { posts: [], recentSkills: [], nextCursor: null, hasMore: false, userPostsCount: 0 };
   }
 }
 
@@ -212,13 +218,14 @@ export default async function NewsfeedPage() {
       <Header />
 
       <main className="pb-20 md:pb-0">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <NewsfeedContent
             initialPosts={initialData.posts}
             initialSkills={initialData.recentSkills}
             initialCursor={initialData.nextCursor}
             initialHasMore={initialData.hasMore}
             currentUserId={session.user.id}
+            userPostsCount={initialData.userPostsCount}
           />
         </div>
       </main>

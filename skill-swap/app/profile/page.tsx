@@ -135,6 +135,30 @@ export default function ProfilePage() {
     fetchProfile();
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.location.hash === '#posts') {
+        const element = document.getElementById('posts');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    };
+
+    if (!loading && profile) {
+      // Run once after DOM content updates and layout settles
+      const timer = setTimeout(handleScroll, 300);
+      
+      // Also listen to hashchange event
+      window.addEventListener('hashchange', handleScroll);
+      
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('hashchange', handleScroll);
+      };
+    }
+  }, [loading, profile]);
+
   if (loading) {
     return (
       <>
@@ -530,7 +554,11 @@ export default function ProfilePage() {
           </div>
 
           {/* Posts Section */}
-          {profile && <UserPostsSection userId={profile.id} />}
+          {profile && (
+            <div id="posts">
+              <UserPostsSection userId={profile.id} />
+            </div>
+          )}
         </div>
       </main>
 
