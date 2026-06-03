@@ -6,6 +6,8 @@
 
 A full-stack web application where people teach what they know and learn what they want — powered by a credit-based economy, real-time chat, live video/audio sessions, and an AI learning-roadmap assistant.
 
+🔗 **Live app:** [skill-swap-marketplace-woad.vercel.app](https://skill-swap-marketplace-woad.vercel.app/)
+
 </div>
 
 ---
@@ -49,10 +51,12 @@ A full-stack web application where people teach what they know and learn what th
 
 The project is composed of **two deployable units** that share a single PostgreSQL database:
 
-| Unit | Folder | Role |
-|------|--------|------|
-| **Next.js Application** | `skill-swap/` | Web UI, REST API routes, authentication, business logic, AI roadmap, LiveKit token issuance |
-| **WebSocket Microservice** | `socket-server/` | Real-time messaging, presence/heartbeat tracking, call signaling, notification fan-out |
+| Unit | Folder | Role | Hosting |
+|------|--------|------|---------|
+| **Next.js Application** | `skill-swap/` | Web UI, REST API routes, authentication, business logic, AI roadmap, LiveKit token issuance | **Vercel** |
+| **WebSocket Microservice** | `socket-server/` | Real-time messaging, presence/heartbeat tracking, call signaling, notification fan-out | **Render** |
+
+> 🔗 Production deployment: **[skill-swap-marketplace-woad.vercel.app](https://skill-swap-marketplace-woad.vercel.app/)** (Next.js on Vercel), with the WebSocket microservice running on Render.
 
 ---
 
@@ -239,9 +243,9 @@ Skill-Swap/Code/
 - **pnpm** (lockfiles present in both packages; `socket-server` also has a `package-lock.json`)
 - **nodemon** + **tsx** / **ts-node** for the socket server dev/runtime
 - **ESLint** (`next/core-web-vitals`, `next/typescript`, import ordering rules)
-- A commented production socket URL in `.env.example` points to **Render** (`onrender.com`), suggesting Render as a hosting target for the socket server. The Next.js app's hosting target is **Not explicitly detected from codebase** (Prisma comments reference Vercel serverless tuning).
+- **Hosting**: the **Next.js app is deployed on Vercel** ([skill-swap-marketplace-woad.vercel.app](https://skill-swap-marketplace-woad.vercel.app/)); the **WebSocket microservice is deployed on Render** (the commented production socket URL in `.env.example` points to `*.onrender.com`).
 - Docker: **Not detected from codebase**
-- CI/CD pipelines: **Not detected from codebase**
+- CI/CD pipelines: **Not detected from codebase** (Vercel and Render provide their own Git-based auto-deploy)
 
 ---
 
@@ -801,18 +805,34 @@ pnpm exec prisma migrate dev        # local development
 5. Configure OAuth redirect URIs, LiveKit credentials, the LLM key, and (optionally) Brevo.
 6. If using LiveKit webhooks, point your LiveKit project's webhook at `POST /api/livekit/webhook`.
 
-### Next.js app
-- Standard `pnpm build` → `pnpm start`. The Prisma client is tuned for serverless pooling (e.g. Vercel), but the explicit hosting provider is **Not detected from codebase**.
+### Next.js app — Vercel
+The web app is deployed on **Vercel** at **[skill-swap-marketplace-woad.vercel.app](https://skill-swap-marketplace-woad.vercel.app/)**.
 
-### Socket server
-- Run `pnpm start` (`tsx server.ts`) under a process manager (PM2/systemd) or a container. Handles `SIGTERM` for graceful shutdown (closes the HTTP server, Prisma, and Redis clients).
-- The commented production URL in `.env.example` (`*.onrender.com`) indicates prior deployment on **Render**.
+1. Import the repository into Vercel and set the **Root Directory** to `skill-swap/`.
+2. Build command: `pnpm build` (runs `prisma generate && next build`); output is handled by Vercel's Next.js preset.
+3. Add all `skill-swap` environment variables (see the table above) in **Project Settings → Environment Variables**. In particular:
+   - `NEXTAUTH_URL` → `https://skill-swap-marketplace-woad.vercel.app`
+   - `NEXT_PUBLIC_SOCKET_URL` → your Render socket URL (e.g. `https://<service>.onrender.com`)
+   - `SOCKET_SECRET` → identical to the Render service's value
+4. The Prisma client is tuned for serverless pooling (`max: 2`, Supabase transaction pooler) which suits Vercel's function model.
+5. Update Google/Facebook OAuth redirect URIs to the Vercel domain, and point the LiveKit webhook at `https://skill-swap-marketplace-woad.vercel.app/api/livekit/webhook`.
+
+### Socket server — Render
+The WebSocket microservice is deployed on **Render** as a Web Service.
+
+1. Create a **Web Service** with **Root Directory** `socket-server/`.
+2. Build command: `pnpm install && pnpm exec prisma generate`.
+3. Start command: `pnpm start` (`tsx server.ts`).
+4. Environment variables: `DATABASE_URL`, `SOCKET_SECRET` (must match Vercel), `NEXTJS_URL=https://skill-swap-marketplace-woad.vercel.app`, `REDIS_URL` (Render Redis / managed Redis), and optionally `PORT` (Render injects its own `PORT`, which the server already honors).
+5. The server handles `SIGTERM` for graceful shutdown (closes the HTTP server, Prisma, and Redis clients) — compatible with Render's deploy/restart lifecycle.
+
+> Keep the two services pointed at each other: Vercel's `NEXT_PUBLIC_SOCKET_URL` = the Render URL, and Render's `NEXTJS_URL` = the Vercel URL (used as the Socket.IO CORS origin). `SOCKET_SECRET` must be identical on both.
 
 ### Docker
-- **Not detected from codebase.** No `Dockerfile`, `docker-compose.yml`, or container config exists.
+- **Not detected from codebase.** No `Dockerfile`, `docker-compose.yml`, or container config exists. Both platforms (Vercel, Render) deploy directly from Git without containers here.
 
 ### CI/CD
-- **Not detected from codebase.** No `.github/workflows`, GitLab CI, or other pipeline files exist.
+- **Not detected from codebase** (no `.github/workflows` or similar). Vercel and Render each provide **Git-based auto-deploy** on push, which serves as the de facto CI/CD.
 
 ---
 
