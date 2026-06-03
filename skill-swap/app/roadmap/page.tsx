@@ -22,26 +22,32 @@ export const metadata = {
 
 export const dynamic = 'force-dynamic';
 
-async function getRoadmapPageData(userId: string) {
+async function getSkillsWanted(userId: string) {
   try {
-    const [skillsWanted, roadmaps] = await Promise.all([
-      prisma.skillWant.findMany({
-        where: { userId },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          proficiencyTarget: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.learningRoadmap.findMany({
-        where: { userId, isArchived: false },
-        orderBy: { updatedAt: 'desc' },
-      }),
-    ]);
+    return await prisma.skillWant.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        proficiencyTarget: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  } catch (error) {
+    console.error('Error fetching learning goals:', error);
+    return [];
+  }
+}
 
-    const savedRoadmaps = roadmaps.map((r) => {
+async function getSavedRoadmaps(userId: string) {
+  try {
+    const roadmaps = await prisma.learningRoadmap.findMany({
+      where: { userId, isArchived: false },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return roadmaps.map((r) => {
       const content = r.content as unknown as LearningRoadmapContent;
       return {
         id: r.id,
@@ -59,12 +65,21 @@ async function getRoadmapPageData(userId: string) {
         updatedAt: r.updatedAt.toISOString(),
       };
     });
-
-    return { skillsWanted, savedRoadmaps };
   } catch (error) {
-    console.error('Error fetching roadmap page data:', error);
-    return { skillsWanted: [], savedRoadmaps: [] };
+    // A missing/empty roadmaps table must never hide the user's learning goals.
+    console.error('Error fetching saved roadmaps:', error);
+    return [];
   }
+}
+
+async function getRoadmapPageData(userId: string) {
+  // Fetch independently so one failing query can't blank out the other.
+  const [skillsWanted, savedRoadmaps] = await Promise.all([
+    getSkillsWanted(userId),
+    getSavedRoadmaps(userId),
+  ]);
+
+  return { skillsWanted, savedRoadmaps };
 }
 
 export default async function RoadmapPage() {
