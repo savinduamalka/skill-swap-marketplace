@@ -1,5 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Header } from '@/components/layout/header';
+import { MobileNav } from '@/components/layout/mobile-nav';
 
 /**
  * Dashboard Loading Component
@@ -9,20 +11,12 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
  */
 export default function DashboardLoading() {
   return (
-    <div className="flex h-screen flex-col bg-background">
-      {/* Header skeleton */}
-      <div className="h-16 border-b bg-background">
-        <div className="flex h-full items-center justify-between px-4">
-          <Skeleton className="h-8 w-32" />
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-          </div>
-        </div>
-      </div>
+    <>
+      <Header />
+      <MobileNav />
 
-      <main className="flex-1 overflow-auto">
-        <div className="space-y-6 p-4 md:p-6">
+      <main className="pb-20 md:pb-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {/* Welcome Section */}
           <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
@@ -75,7 +69,7 @@ export default function DashboardLoading() {
             </Card>
           </section>
 
-          {/* Main Content Area */}
+          {/* Credit Flow & Rating */}
           <section className="grid gap-4 lg:grid-cols-2">
             {[1, 2].map((i) => (
               <Card key={i}>
@@ -104,8 +98,8 @@ export default function DashboardLoading() {
             ))}
           </section>
 
-          {/* Upcoming Sessions & Quick Actions */}
-          <section className="grid gap-4 lg:grid-cols-2">
+          {/* Upcoming Sessions */}
+          <section className="grid gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <Skeleton className="h-5 w-40" />
@@ -126,22 +120,9 @@ export default function DashboardLoading() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-5 w-32" />
-                <Skeleton className="h-4 w-48" />
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <Skeleton key={i} className="h-20 w-full" />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </section>
         </div>
       </main>
-    </div>
+    </>
   );
 }

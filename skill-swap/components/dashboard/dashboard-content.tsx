@@ -149,12 +149,12 @@ export function DashboardContent({ initialData }: DashboardContentProps) {
   const showSkeletons = isLoading && !dashboardData;
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <>
       <Header />
       <MobileNav />
 
-      <main className="flex-1 overflow-auto">
-        <div className="space-y-6 p-4 md:p-6">
+      <main className="pb-20 md:pb-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {/* Welcome Section */}
           <WelcomeSection
             userName={session?.user?.name}
@@ -196,14 +196,13 @@ export function DashboardContent({ initialData }: DashboardContentProps) {
             <PostEngagementCard stats={stats} isLoading={showSkeletons} />
           </section>
 
-          {/* Upcoming Sessions & Quick Actions */}
-          <section className="grid gap-4 lg:grid-cols-2">
+          {/* Upcoming Sessions */}
+          <section className="grid gap-4">
             <UpcomingSessionsCard sessions={upcomingSessions} isLoading={showSkeletons} />
-            <QuickActionsCard stats={stats} />
           </section>
         </div>
       </main>
-    </div>
+    </>
   );
 }
 
