@@ -84,8 +84,7 @@ export interface DashboardData {
 /**
  * Fetch core stats (cached for 30 seconds per user)
  */
-export const getCachedDashboardStats = unstable_cache(
-  async (userId: string): Promise<DashboardStats> => {
+export async function getDashboardStats(userId: string): Promise<DashboardStats> {
     const [
       wallet,
       skillsOffered,
@@ -217,16 +216,14 @@ export const getCachedDashboardStats = unstable_cache(
       posts: { total: totalPosts, likes: totalLikes, comments: totalComments, views: totalViews },
       messages: { unread: unreadMessages },
     };
-  },
-  ['dashboard-stats'],
-  { revalidate: 30, tags: ['dashboard'] }
-);
+}
+
+export const getCachedDashboardStats = getDashboardStats;
 
 /**
  * Fetch upcoming sessions (cached for 60 seconds)
  */
-export const getCachedUpcomingSessions = unstable_cache(
-  async (userId: string): Promise<UpcomingSession[]> => {
+export async function getUpcomingSessions(userId: string): Promise<UpcomingSession[]> {
     const sessions = await prisma.session.findMany({
       where: {
         OR: [{ learnerId: userId }, { providerId: userId }],
@@ -260,16 +257,14 @@ export const getCachedUpcomingSessions = unstable_cache(
         : { id: s.learner.id, name: s.learner.fullName || s.learner.name, image: s.learner.image },
       role: s.learnerId === userId ? 'learner' : 'provider',
     }));
-  },
-  ['upcoming-sessions'],
-  { revalidate: 60, tags: ['dashboard', 'sessions'] }
-);
+}
+
+export const getCachedUpcomingSessions = getUpcomingSessions;
 
 /**
  * Fetch chart data (cached for 5 minutes - less frequently updated)
  */
-export const getCachedChartData = unstable_cache(
-  async (userId: string): Promise<ChartData> => {
+export async function getChartData(userId: string): Promise<ChartData> {
     const now = new Date();
 
     // Get monthly session data
@@ -353,10 +348,9 @@ export const getCachedChartData = unstable_cache(
       skillsDistribution,
       sessionModes: { online, physical },
     };
-  },
-  ['chart-data'],
-  { revalidate: 300, tags: ['dashboard', 'charts'] }
-);
+}
+
+export const getCachedChartData = getChartData;
 
 /**
  * Calculate credit flow for visualization
