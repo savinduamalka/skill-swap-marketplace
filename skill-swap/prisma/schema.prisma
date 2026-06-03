@@ -125,6 +125,7 @@ model User {
   blockedUsers          BlockedUser[]             @relation("Blocker")
   blockedBy             BlockedUser[]             @relation("Blocked")
   onlineStatusHistory   UserOnlineStatus[]
+  learningRoadmaps      LearningRoadmap[]
 
   @@index([email])
   @@index([isOnline])
@@ -211,6 +212,33 @@ model SkillWant {
   @@index([userId])
   @@index([name])
   @@map("skill_wants")
+}
+
+// ==================== LEARNING ROADMAP MODEL ====================
+model LearningRoadmap {
+  id                    String    @id @default(cuid())
+  userId                String
+  skillWantId           String?   // Optional link to the originating learning goal
+  skillName             String
+  skillDescription      String?   @db.Text
+  proficiencyTarget     String?   // "Beginner" | "Intermediate" | "Advanced" | "Expert"
+
+  title                 String              
+  summary               String?   @db.Text  
+  estimatedDuration     String?             
+  content               Json                
+  completedSteps        String[]  @default([]) // Step ids the user has completed
+  isArchived            Boolean   @default(false)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([skillName])
+  @@map("learning_roadmaps")
 }
 
 // ==================== CONNECTION MODELS ====================
