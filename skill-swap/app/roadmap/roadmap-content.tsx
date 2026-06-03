@@ -375,14 +375,21 @@ export function RoadmapContent({
                       disabled={isGenerating}
                     >
                       <SelectTrigger className="w-full">
-                        <div className="flex items-center gap-2">
-                          <BookOpen className="h-4 w-4 text-muted-foreground" />
-                          <SelectValue placeholder="Select a skill" />
+                        <div className="flex items-center gap-2 min-w-0">
+                          <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <SelectValue
+                            placeholder="Select a skill"
+                            className="min-w-0 truncate"
+                          />
                         </div>
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
                         {skillsWanted.map((skill) => (
-                          <SelectItem key={skill.id} value={skill.id}>
+                          <SelectItem
+                            key={skill.id}
+                            value={skill.id}
+                            className="whitespace-normal"
+                          >
                             {skill.name}
                             {skill.proficiencyTarget
                               ? ` · ${skill.proficiencyTarget}`
