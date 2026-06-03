@@ -12,7 +12,7 @@ import {
   Plus,
   Compass,
   CalendarCheck,
-  Newspaper,
+  Map as MapIcon,
 } from 'lucide-react';
 
 // Routes where the bottom nav should be hidden
@@ -55,7 +55,7 @@ export function MobileNav() {
     { href: '/search', label: 'Search', icon: Search },
     { href: '/create', label: 'Create', icon: Plus, isAction: true },
     { href: '/sessions', label: 'Sessions', icon: CalendarCheck, badgeCount: pendingSessions },
-    { href: '/newsfeed', label: 'Feed', icon: Newspaper },
+    { href: '/roadmap', label: 'Roadmap', icon: MapIcon },
   ];
 
   /**

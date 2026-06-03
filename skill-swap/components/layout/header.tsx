@@ -42,6 +42,7 @@ import { Users } from 'lucide-react';
 const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/search', label: 'Search Skills' },
+  { href: '/roadmap', label: 'Roadmap' },
   { href: '/newsfeed', label: 'Newsfeed' },
   { href: '/sessions', label: 'Sessions' },
 ] as const;
