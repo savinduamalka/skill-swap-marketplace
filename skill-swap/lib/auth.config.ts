@@ -23,10 +23,10 @@ export const authConfig: NextAuthConfig = {
       const publicRoutes = ['/', '/login', '/signup'];
       const isPublicRoute = publicRoutes.includes(pathname);
 
-      // Auth routes (login/signup) - redirect to dashboard if already logged in
-      const isAuthRoute = pathname === '/login' || pathname === '/signup';
+      // Auth and landing routes - redirect to dashboard if already logged in
+      const isRedirectRoute = pathname === '/login' || pathname === '/signup' || pathname === '/';
 
-      if (isAuthRoute && isLoggedIn) {
+      if (isRedirectRoute && isLoggedIn) {
         return Response.redirect(new URL('/dashboard', nextUrl));
       }
 
