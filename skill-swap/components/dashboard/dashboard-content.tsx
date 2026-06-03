@@ -651,7 +651,13 @@ const UpcomingSessionsCard = memo(function UpcomingSessionsCard({
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      {format(new Date(session.startDate), 'MMM d, yyyy h:mm a')}
+                      {(() => {
+                        const start = new Date(session.startDate);
+                        const hasTime = start.getHours() !== 0 || start.getMinutes() !== 0;
+                        return hasTime 
+                          ? format(start, 'MMM d, yyyy h:mm a')
+                          : format(start, 'MMM d, yyyy');
+                      })()}
                       <Badge variant="outline" className="ml-1">
                         {session.mode === 'ONLINE' ? (
                           <Video className="mr-1 h-3 w-3" />
