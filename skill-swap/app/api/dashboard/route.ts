@@ -395,11 +395,11 @@ function calculateCreditFlow(transactions: { amount: number; type: string; creat
     });
 
     const earned = dayTransactions
-      .filter((t) => t.type.includes('RECEIVED') || t.type === 'SESSION_COMPLETED')
-      .reduce((acc, t) => acc + Math.abs(t.amount), 0);
+      .filter((t) => t.amount > 0)
+      .reduce((acc, t) => acc + t.amount, 0);
 
     const spent = dayTransactions
-      .filter((t) => t.type.includes('SENT'))
+      .filter((t) => t.amount < 0)
       .reduce((acc, t) => acc + Math.abs(t.amount), 0);
 
     days.push({
