@@ -1,6 +1,6 @@
 <div align="center">
 
-# SkillSwap
+# SkillSwap Marketplace
 
 **Peer-to-Peer Skill Exchange Platform for Community-Driven Learning**
 
@@ -37,7 +37,7 @@ A full-stack web application where people teach what they know and learn what th
 
 ## Overview
 
-**SkillSwap** is a community marketplace for exchanging skills. Members list skills they can teach and skills they want to learn, then connect with each other to run learning sessions. Instead of money, the platform runs on an internal **credit economy** (every new user gets 100 credits): credits are held when sending connection/session requests and settled when sessions complete or are cancelled.
+**SkillSwap Marketplace** is a community marketplace for exchanging skills. Members list skills they can teach and skills they want to learn, then connect with each other to run learning sessions. Instead of money, the platform runs on an internal **credit economy** (every new user gets 100 credits): credits are held when sending connection/session requests and settled when sessions complete or are cancelled.
 
 ### Purpose of the System
 
