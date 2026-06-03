@@ -282,14 +282,66 @@ export default function SessionsPage() {
       .slice(0, 2)
   }
 
-  // Format date
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-US", {
+  // Format date and time range
+  const formatDateTimeRange = (startStr: string, endStr: string | null) => {
+    const start = new Date(startStr)
+    const end = endStr ? new Date(endStr) : null
+
+    // Check if start time is specified (non-midnight in local time)
+    const hasStartTime = start.getHours() !== 0 || start.getMinutes() !== 0
+    const hasEndTime = end ? (end.getHours() !== 0 || end.getMinutes() !== 0) : false
+
+    const dateFormatted = start.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
       year: "numeric",
     })
+
+    if (hasStartTime) {
+      const timeFormatted = start.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+
+      if (end && hasEndTime) {
+        const isSameDay = start.toDateString() === end.toDateString()
+        const endTimeFormatted = end.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        })
+
+        if (isSameDay) {
+          return `${dateFormatted} (${timeFormatted} - ${endTimeFormatted})`
+        } else {
+          const endDateFormatted = end.toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+          return `${dateFormatted} at ${timeFormatted} - ${endDateFormatted} at ${endTimeFormatted}`
+        }
+      }
+      return `${dateFormatted} at ${timeFormatted}`
+    }
+
+    if (end) {
+      const isSameDay = start.toDateString() === end.toDateString()
+      if (isSameDay) {
+        return dateFormatted
+      }
+
+      const endDateFormatted = end.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+      return `${dateFormatted} - ${endDateFormatted}`
+    }
+
+    return dateFormatted
   }
 
   // Render session request card
@@ -329,10 +381,7 @@ export default function SessionsPage() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="w-4 h-4" />
-                <span>{formatDate(request.startDate)}</span>
-                {request.endDate && (
-                  <span>- {formatDate(request.endDate)}</span>
-                )}
+                <span>{formatDateTimeRange(request.startDate, request.endDate)}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 {request.mode === "ONLINE" ? (
@@ -464,10 +513,7 @@ export default function SessionsPage() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="w-4 h-4" />
-                <span>{formatDate(session.startDate)}</span>
-                {session.endDate && (
-                  <span>- {formatDate(session.endDate)}</span>
-                )}
+                <span>{formatDateTimeRange(session.startDate, session.endDate)}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 {session.mode === "ONLINE" ? (

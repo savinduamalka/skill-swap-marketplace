@@ -85,6 +85,8 @@ export function CreateSessionRequestDialog({
   const [mode, setMode] = useState<"ONLINE" | "PHYSICAL">("ONLINE")
   const [startDate, setStartDate] = useState<Date | undefined>()
   const [endDate, setEndDate] = useState<Date | undefined>()
+  const [startTime, setStartTime] = useState("")
+  const [endTime, setEndTime] = useState("")
   const [agreedCredits, setAgreedCredits] = useState<string | number>(20)
 
   // Fetch receiver skills when receiverId changes
@@ -154,6 +156,8 @@ export function CreateSessionRequestDialog({
     setMode("ONLINE")
     setStartDate(undefined)
     setEndDate(undefined)
+    setStartTime("")
+    setEndTime("")
     setAgreedCredits(20)
   }
 
@@ -190,6 +194,27 @@ export function CreateSessionRequestDialog({
       return
     }
 
+    // Combine date and time
+    let finalStartDate = new Date(startDate);
+    if (startTime) {
+      const [hours, minutes] = startTime.split(":").map(Number);
+      finalStartDate.setHours(hours, minutes, 0, 0);
+    } else {
+      finalStartDate.setHours(0, 0, 0, 0);
+    }
+
+    let finalEndDate = endDate ? new Date(endDate) : new Date(startDate);
+    if (endTime) {
+      const [hours, minutes] = endTime.split(":").map(Number);
+      finalEndDate.setHours(hours, minutes, 0, 0);
+    } else if (startTime && !endDate) {
+      // Default to 1 hour after start time if start time is set but no end time/date is specified
+      const [hours, minutes] = startTime.split(":").map(Number);
+      finalEndDate.setHours(hours + 1, minutes, 0, 0);
+    } else {
+      finalEndDate.setHours(0, 0, 0, 0);
+    }
+
     setLoading(true)
     try {
       const res = await fetch("/api/sessions/requests", {
@@ -201,8 +226,8 @@ export function CreateSessionRequestDialog({
           receiverId,
           skillId,
           mode,
-          startDate: startDate.toISOString(),
-          endDate: endDate?.toISOString() || startDate.toISOString(),
+          startDate: finalStartDate.toISOString(),
+          endDate: finalEndDate.toISOString(),
           agreedCredits: creditsNum,
         }),
       })
@@ -402,7 +427,7 @@ export function CreateSessionRequestDialog({
             </RadioGroup>
           </div>
 
-          {/* Date Selection */}
+          {/* Start Date & Time Selection */}
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>Start Date *</Label>
@@ -411,7 +436,7 @@ export function CreateSessionRequestDialog({
                   <Button
                     variant="outline"
                     className={cn(
-                      "justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal",
                       !startDate && "text-muted-foreground"
                     )}
                   >
@@ -431,13 +456,26 @@ export function CreateSessionRequestDialog({
               </Popover>
             </div>
             <div className="grid gap-2">
+              <Label>Start Time (optional)</Label>
+              <Input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          {/* End Date & Time Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
               <Label>End Date (optional)</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
-                      "justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal",
                       !endDate && "text-muted-foreground"
                     )}
                   >
@@ -457,6 +495,16 @@ export function CreateSessionRequestDialog({
                   />
                 </PopoverContent>
               </Popover>
+            </div>
+            <div className="grid gap-2">
+              <Label>End Time (optional)</Label>
+              <Input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full"
+                disabled={!startDate}
+              />
             </div>
           </div>
         </div>
