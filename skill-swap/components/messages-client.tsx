@@ -1540,8 +1540,8 @@ export function MessagesClient() {
     return (
       <>
         <Header />
-        <main className="pb-20 md:pb-0">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-200px)]">
+        <main className="pb-0">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 h-[calc(100dvh-128px)] md:h-[calc(100vh-200px)]">
             <Card className="p-8 h-full flex items-center justify-center">
               <div className="text-center space-y-4">
                 <Skeleton className="h-12 w-48 mx-auto" />
@@ -1559,8 +1559,8 @@ export function MessagesClient() {
     return (
       <>
         <Header />
-        <main className="pb-20 md:pb-0">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-200px)]">
+        <main className="pb-0">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 h-[calc(100dvh-128px)] md:h-[calc(100vh-200px)]">
             <Card className="p-8 h-full flex items-center justify-center">
               <div className="text-center">
                 <h2 className="text-2xl font-bold mb-2">
@@ -1582,8 +1582,8 @@ export function MessagesClient() {
     <>
       <Header />
 
-      <main className="pb-20 md:pb-0">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-200px)] flex flex-col md:flex-row gap-6">
+      <main className="pb-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 h-[calc(100dvh-128px)] md:h-[calc(100vh-200px)] flex flex-col md:flex-row gap-6">
           {/* Conversation List Sidebar */}
           <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 md:border-r border-border`}>
             {/* Connection Status */}
