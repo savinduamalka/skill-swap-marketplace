@@ -9,9 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import {
   Home,
   Search,
-  Plus,
   Compass,
   CalendarCheck,
+  Newspaper,
   Map as MapIcon,
 } from 'lucide-react';
 
@@ -23,7 +23,6 @@ interface NavItem {
   href: string;
   label: string;
   icon: typeof Home;
-  isAction?: boolean;
   badgeCount?: number;
 }
 
@@ -49,11 +48,11 @@ export function MobileNav() {
   // Hide on auth-related pages and the root landing page
   if (pathname === '/' || HIDDEN_ROUTES.some((route) => pathname.startsWith(route))) return null;
 
-  // Navigation items 
+  // Navigation items
   const navItems: NavItem[] = [
     { href: '/dashboard', label: 'Home', icon: Home },
     { href: '/search', label: 'Search', icon: Search },
-    { href: '/create', label: 'Create', icon: Plus, isAction: true },
+    { href: '/newsfeed', label: 'Feed', icon: Newspaper },
     { href: '/sessions', label: 'Sessions', icon: CalendarCheck, badgeCount: pendingSessions },
     { href: '/roadmap', label: 'Roadmap', icon: MapIcon },
   ];
@@ -84,23 +83,6 @@ export function MobileNav() {
         {navItems.map((item) => {
           const IconComponent = item.icon;
           const isActive = isActivePath(item.href);
-
-          // Special styling for the center "create" action button
-          if (item.isAction) {
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="mobile-nav-create-btn flex items-center justify-center relative -mt-3"
-                aria-label="Create new post"
-                id="mobile-nav-create"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/25 transition-all duration-200 active:scale-90 hover:shadow-primary/40">
-                  <IconComponent className="w-6 h-6 text-primary-foreground" strokeWidth={2.5} />
-                </div>
-              </Link>
-            );
-          }
 
           return (
             <Link
