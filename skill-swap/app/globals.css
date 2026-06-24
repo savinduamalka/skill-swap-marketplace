@@ -138,6 +138,65 @@
   }
 }
 
+/* ===== Landing Page Animations ===== */
+
+/* Floating emoji animation */
+@keyframes float {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.7;
+  }
+  90% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(-100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-float {
+  animation: float 7s ease-in-out infinite;
+}
+
+/* Subtle pulse for badge */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.02);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+/* SVG line draw animation */
+@keyframes draw-line {
+  from {
+    stroke-dasharray: 300;
+    stroke-dashoffset: 300;
+  }
+  to {
+    stroke-dasharray: 300;
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-draw-line {
+  animation: draw-line 1.5s ease-out forwards;
+  animation-delay: 0.5s;
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+}
+
 /* ===== Mobile Bottom Navigation Styles ===== */
 
 /* Active pill indicator animation */
