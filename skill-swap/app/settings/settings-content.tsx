@@ -1715,10 +1715,9 @@ export function SettingsContent({ user }: SettingsContentProps) {
             <Separator />
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>New Match Notifications</Label>
+                <Label>Connection Request Notifications</Label>
                 <p className="text-sm text-muted-foreground">
-                  Be notified when someone wants to learn/teach a skill you
-                  offer/want
+                  Get an email when someone sends you a connection request
                 </p>
               </div>
               <Switch
