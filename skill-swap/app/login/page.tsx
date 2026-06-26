@@ -62,6 +62,7 @@ export default function LoginPage() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [socialLoginInfo, setSocialLoginInfo] = useState<{ provider: string; message: string } | null>(null);
 
   // Check for callbackUrl indicating logout redirect
   useEffect(() => {
@@ -197,6 +198,7 @@ export default function LoginPage() {
 
     setResetLoading(true);
     setResetSuccess(false);
+    setSocialLoginInfo(null);
 
     try {
       const response = await fetch('/api/auth/forgot-password', {
@@ -210,7 +212,18 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Rate limit — show as a warning, not an error
+        if (response.status === 429) {
+          toast.warning(data.error || 'Please wait before requesting again.');
+          return;
+        }
         throw new Error(data.error || 'Failed to send password reset request');
+      }
+
+      // Handle social login accounts (no password to reset)
+      if (data.socialLogin) {
+        setSocialLoginInfo({ provider: data.provider, message: data.message });
+        return;
       }
 
       setResetSuccess(true);
@@ -350,7 +363,13 @@ export default function LoginPage() {
                     </Label>
                   </div>
 
-                  <Dialog>
+                  <Dialog onOpenChange={(open) => {
+                    if (open) {
+                      setSocialLoginInfo(null);
+                      setResetSuccess(false);
+                      setResetEmail('');
+                    }
+                  }}>
                     <DialogTrigger asChild>
                       <button
                         type="button"
@@ -375,6 +394,18 @@ export default function LoginPage() {
                             Password reset link sent! Check your email inbox.
                           </AlertDescription>
                         </Alert>
+                      ) : socialLoginInfo ? (
+                        <div className="space-y-4 py-4">
+                          <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
+                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            <AlertDescription className="text-amber-800 dark:text-amber-300">
+                              {socialLoginInfo.message}
+                            </AlertDescription>
+                          </Alert>
+                          <p className="text-sm text-muted-foreground text-center">
+                            Close this dialog and use the <strong>&quot;{socialLoginInfo.provider}&quot;</strong> button in the Social Login tab to sign in.
+                          </p>
+                        </div>
                       ) : (
                         <div className="space-y-4 py-4">
                           <div>

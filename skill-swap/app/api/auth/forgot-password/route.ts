@@ -1,6 +1,21 @@
+/**
+ * Forgot Password API Route
+ *
+ * Generates a secure password reset token and sends a reset link
+ * to the user's email via Resend. Uses time-limited tokens and
+ * prevents email enumeration by returning a generic success message.
+ *
+ * @fileoverview POST /api/auth/forgot-password
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
+import { sendPasswordResetEmail } from '@/lib/email';
+
+// Rate limit: prevent email-send abuse (simple in-memory, per-email)
+const rateLimitMap = new Map<string, number>();
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,27 +23,76 @@ export async function POST(request: NextRequest) {
     const { email } = body;
 
     if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Email is required' },
+        { status: 400 }
+      );
     }
 
-    // Find user by email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find user by email, include auth-related fields
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        name: true,
+        passwordHash: true,
+        accounts: { select: { provider: true } },
+      },
     });
 
-    // To prevent email enumeration, return a generic message even if the user is not found
+    // Prevent email enumeration: always return success message
     if (!user) {
       return NextResponse.json({
         success: true,
-        message: 'If this email is registered, a password reset link has been generated.',
+        message: 'If an account with that email exists, a password reset link has been sent.',
       });
     }
 
-    // Generate token and expiration (1 hour from now)
-    const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 3600000); // 1 hour
+    // Check if user signed up via social login (no password set)
+    // This check always runs — no rate limiting here so the user always gets feedback
+    const hasPassword = !!user.passwordHash;
+    const socialProviders = user.accounts.map((a) => a.provider).filter(
+      (p) => p === 'google' || p === 'facebook'
+    );
+    const hasSocialAccount = socialProviders.length > 0;
 
-    // Store in database
+    if (!hasPassword) {
+      // User has no password — they can only log in via their social provider
+      const providerName = socialProviders.includes('google')
+        ? 'Google'
+        : socialProviders.includes('facebook')
+          ? 'Facebook'
+          : hasSocialAccount
+            ? socialProviders[0]
+            : 'a social provider';
+
+      return NextResponse.json({
+        success: false,
+        socialLogin: true,
+        provider: providerName,
+        message: `This account is linked to ${providerName}. Please use the "${providerName}" button on the login page to sign in. Password reset is not available for social login accounts.`,
+      });
+    }
+
+    // Rate limit only the actual email-sending operation
+    const lastRequest = rateLimitMap.get(normalizedEmail);
+    if (lastRequest && Date.now() - lastRequest < RATE_LIMIT_WINDOW_MS) {
+      return NextResponse.json(
+        { error: 'Please wait a moment before requesting another reset email.' },
+        { status: 429 }
+      );
+    }
+    rateLimitMap.set(normalizedEmail, Date.now());
+
+    // Generate a cryptographically secure token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Store the reset token on the user record
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -37,74 +101,36 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Build the reset link
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
     const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
+    // Send the reset email via Resend
+    const userName = user.fullName || user.name || undefined;
+    const emailResult = await sendPasswordResetEmail(
+      user.email!,
+      resetLink,
+      userName
+    );
 
-
-    // Send email via Brevo API using native fetch
-    if (process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL) {
-      try {
-        const emailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'accept': 'application/json',
-            'api-key': process.env.BREVO_API_KEY,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            sender: {
-              name: 'SkillSwap',
-              email: process.env.BREVO_SENDER_EMAIL,
-            },
-            to: [
-              {
-                email: user.email,
-              },
-            ],
-            subject: 'Reset your SkillSwap Password',
-            htmlContent: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #ffffff;">
-                <h2 style="color: #2563eb; text-align: center; margin-bottom: 20px;">Reset your Password</h2>
-                <p style="color: #374151; font-size: 16px; line-height: 1.5;">Hello,</p>
-                <p style="color: #374151; font-size: 16px; line-height: 1.5;">We received a request to reset your password for your SkillSwap account. Click the button below to choose a new password. This link is valid for 1 hour.</p>
-                <div style="text-align: center; margin: 30px 0;">
-                  <a href="${resetLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">Reset Password</a>
-                </div>
-                <p style="color: #374151; font-size: 14px; line-height: 1.5;">Or, copy and paste this URL into your browser:</p>
-                <p style="word-break: break-all; color: #2563eb; font-size: 14px; line-height: 1.5;">${resetLink}</p>
-                <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-                <p style="font-size: 12px; color: #9ca3af; text-align: center;">If you did not request a password reset, please ignore this email.</p>
-              </div>
-            `,
-          }),
-        });
-
-        if (!emailRes.ok) {
-          const emailError = await emailRes.json();
-          console.error('Brevo API dispatch error:', emailError);
-        } else {
-          console.log(`Email successfully dispatched via Brevo to ${user.email}`);
-        }
-      } catch (emailErr) {
-        console.error('Failed to dispatch email via Brevo fetch:', emailErr);
-      }
-    } else {
-      console.warn('BREVO_API_KEY or BREVO_SENDER_EMAIL is not configured in .env. Password reset email was not sent.');
+    if (!emailResult.success) {
+      console.error(`[ForgotPassword] Email delivery failed for ${user.email}:`, emailResult.error);
+      // Don't expose email delivery failures to the client (security)
     }
 
     return NextResponse.json({
       success: true,
-      message: 'If this email is registered, a password reset link has been generated.',
+      message: 'If an account with that email exists, a password reset link has been sent.',
     });
   } catch (error) {
-    console.error('Forgot password API error:', error);
+    console.error('[ForgotPassword] API error:', error);
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { 
-        error: process.env.NODE_ENV === 'production'
-          ? 'An unexpected error occurred. Please try again later.'
-          : `Forgot password error: ${message}`
+      {
+        error:
+          process.env.NODE_ENV === 'production'
+            ? 'An unexpected error occurred. Please try again later.'
+            : `Forgot password error: ${message}`,
       },
       { status: 500 }
     );

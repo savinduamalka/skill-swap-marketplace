@@ -20,7 +20,7 @@ export const authConfig: NextAuthConfig = {
       const pathname = nextUrl.pathname;
 
       // Public routes that don't require authentication
-      const publicRoutes = ['/', '/login', '/signup'];
+      const publicRoutes = ['/', '/login', '/signup', '/reset-password'];
       const isPublicRoute = publicRoutes.includes(pathname);
 
       // Auth and landing routes - redirect to dashboard if already logged in
