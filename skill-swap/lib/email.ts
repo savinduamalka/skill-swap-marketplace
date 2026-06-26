@@ -4,7 +4,7 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Sender configuration
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL;
+const FROM_EMAIL: string = process.env.RESEND_FROM_EMAIL ?? 'SkillSwap <noreply@savinduamalka.app>';
 
 /**
  * Base email template wrapper with SkillSwap branding
