@@ -1276,7 +1276,8 @@ export function MessagesClient() {
 
   // Focus input when clicking on the chat area
   const handleChatAreaClick = () => {
-    if (inputRef.current) {
+    // Don't auto-focus on mobile — it triggers the keyboard
+    if (window.innerWidth >= 768 && inputRef.current) {
       inputRef.current.focus();
     }
   };
@@ -2382,7 +2383,6 @@ export function MessagesClient() {
                     onChange={(e) => setMessageInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     disabled={!isConnected || isSending || isUploading}
-                    autoFocus
                   />
                   <Button
                     size="icon"
