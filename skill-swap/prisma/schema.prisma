@@ -90,6 +90,12 @@ model User {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  // Email Notification Preferences
+  notifyEmail           Boolean   @default(true)            // Master toggle for all email notifications
+  notifyConnectionReq   Boolean   @default(true)            // Connection request received
+  notifySessionReminder Boolean   @default(true)            // Upcoming session reminders
+  notifyMessages        Boolean   @default(true)            // New message received
+
   // Online Status Tracking
   isOnline              Boolean   @default(false)           // Current online status
   lastSeenAt            DateTime  @default(now())          // Last activity timestamp
