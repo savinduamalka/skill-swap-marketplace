@@ -593,20 +593,28 @@ export default async function UserProfilePage({
                 <h2 className="text-lg font-semibold">Wants to Learn</h2>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-3">
                 {profile.skillsWanted.map((skill) => (
-                  <Badge
+                  <div
                     key={skill.id}
-                    variant="outline"
-                    className="px-3 py-1.5 text-sm"
+                    className="p-4 rounded-lg border border-border bg-muted/30"
                   >
-                    {skill.name}
-                    {skill.proficiencyTarget && (
-                      <span className="ml-1 text-muted-foreground">
-                        · {skill.proficiencyTarget}
-                      </span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-foreground">
+                        {skill.name}
+                      </h3>
+                      {skill.proficiencyTarget && (
+                        <Badge variant="secondary" className="text-xs">
+                          Target: {skill.proficiencyTarget}
+                        </Badge>
+                      )}
+                    </div>
+                    {skill.description && (
+                      <p className="text-sm text-muted-foreground">
+                        {skill.description}
+                      </p>
                     )}
-                  </Badge>
+                  </div>
                 ))}
               </div>
             </Card>
