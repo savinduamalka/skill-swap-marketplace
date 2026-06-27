@@ -1726,8 +1726,8 @@ export function MessagesClient() {
     <>
       <Header />
 
-      <main className="pb-0 !pb-0 no-bottom-padding overflow-hidden">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 h-[calc(100dvh-64px)] md:h-[calc(100vh-200px)] flex flex-col md:flex-row gap-6 overflow-hidden">
+      <main className={`pb-0 !pb-0 overflow-hidden ${selectedConversation ? 'no-bottom-padding' : ''}`}>
+        <div className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 ${selectedConversation ? 'h-[calc(100dvh-64px)]' : 'h-[calc(100dvh-128px)]'} md:h-[calc(100vh-200px)] flex flex-col md:flex-row gap-6 overflow-hidden`}>
           {/* Conversation List Sidebar */}
           <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 md:border-r border-border overflow-hidden`}>
             {/* Connection Status */}

@@ -6,7 +6,7 @@
 
 A full-stack web application where people teach what they know and learn what they want — powered by a credit-based economy, real-time chat, live video/audio sessions, and an AI learning-roadmap assistant.
 
-🔗 **Live app:** [skill-swap-marketplace-woad.vercel.app](https://skill-swap-marketplace-woad.vercel.app/)
+🔗 **Live app:** [skillswap.savinduamalka.app](https://skillswap.savinduamalka.app)
 
 </div>
 
@@ -56,7 +56,7 @@ The project is composed of **two deployable units** that share a single PostgreS
 | **Next.js Application** | `skill-swap/` | Web UI, REST API routes, authentication, business logic, AI roadmap, LiveKit token issuance | **Vercel** |
 | **WebSocket Microservice** | `socket-server/` | Real-time messaging, presence/heartbeat tracking, call signaling, notification fan-out | **Render** |
 
-> 🔗 Production deployment: **[skill-swap-marketplace-woad.vercel.app](https://skill-swap-marketplace-woad.vercel.app/)** (Next.js on Vercel), with the WebSocket microservice running on Render.
+> 🔗 Production deployment: **[skillswap.savinduamalka.app](https://skillswap.savinduamalka.app)** (Next.js on Vercel), with the WebSocket microservice running on Render.
 
 ---
 
@@ -243,7 +243,7 @@ Skill-Swap/Code/
 - **pnpm** (lockfiles present in both packages; `socket-server` also has a `package-lock.json`)
 - **nodemon** + **tsx** / **ts-node** for the socket server dev/runtime
 - **ESLint** (`next/core-web-vitals`, `next/typescript`, import ordering rules)
-- **Hosting**: the **Next.js app is deployed on Vercel** ([skill-swap-marketplace-woad.vercel.app](https://skill-swap-marketplace-woad.vercel.app/)); the **WebSocket microservice is deployed on Render** (the commented production socket URL in `.env.example` points to `*.onrender.com`).
+- **Hosting**: the **Next.js app is deployed on Vercel** ([skillswap.savinduamalka.app](https://skillswap.savinduamalka.app)); the **WebSocket microservice is deployed on Render** (the commented production socket URL in `.env.example` points to `*.onrender.com`).
 - Docker: **Not detected from codebase**
 - CI/CD pipelines: **Not detected from codebase** (Vercel and Render provide their own Git-based auto-deploy)
 
