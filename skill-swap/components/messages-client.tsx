@@ -175,6 +175,7 @@ export function MessagesClient() {
     rejectCall,
     endCall,
     setActiveConversation,
+    requestUsersStatus,
     reconnect,
     notifyMessagesDeleted,
     notifyConversationCleared,
@@ -201,6 +202,20 @@ export function MessagesClient() {
     fetchConversations();
   }, []);
 
+  // Request online status of all conversation users when connected
+  useEffect(() => {
+    if (isConnected && conversations.length > 0) {
+      const userIds = conversations.map((conv) => conv.user.id);
+      requestUsersStatus(userIds);
+    }
+  }, [isConnected, conversations.length, requestUsersStatus]);
+
+  // Request status of the selected user when opening a conversation
+  useEffect(() => {
+    if (isConnected && selectedConversation?.otherUser?.id) {
+      requestUsersStatus([selectedConversation.otherUser.id]);
+    }
+  }, [isConnected, selectedConversation?.otherUser?.id, requestUsersStatus]);
   // Handle auto-answer from global call notification
   useEffect(() => {
     const handleAutoAnswer = async () => {

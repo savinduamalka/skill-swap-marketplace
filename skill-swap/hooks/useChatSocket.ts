@@ -314,6 +314,22 @@ export const useChatSocket = () => {
         );
       });
 
+      // Response to get_users_status request
+      socketRef.current.on(
+        'users_status_response',
+        (data: { statuses: Array<{ userId: string; isOnline: boolean; lastSeenAt?: Date | null }> }) => {
+          data.statuses.forEach((status) => {
+            userOnlineCallbacks.current.forEach((cb) =>
+              cb({
+                userId: status.userId,
+                isOnline: status.isOnline,
+                lastSeenAt: status.lastSeenAt || undefined,
+              })
+            );
+          });
+        }
+      );
+
       // Message read receipt event
       socketRef.current.on(
         'message_read',
@@ -440,6 +456,13 @@ export const useChatSocket = () => {
   const setActiveConversation = useCallback((connectionId: string | null) => {
     if (socketRef.current?.connected) {
       socketRef.current.emit('set_active_conversation', { connectionId });
+    }
+  }, []);
+
+  // Request current online status of specific users
+  const requestUsersStatus = useCallback((userIds: string[]) => {
+    if (socketRef.current?.connected && userIds.length > 0) {
+      socketRef.current.emit('get_users_status', { userIds });
     }
   }, []);
 
@@ -714,6 +737,7 @@ export const useChatSocket = () => {
     onNotificationReceived,
     markMessageAsRead,
     setActiveConversation,
+    requestUsersStatus,
     onCallIncoming,
     onCallAnswer,
     onCallIceCandidate,

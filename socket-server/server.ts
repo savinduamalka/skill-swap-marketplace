@@ -328,6 +328,39 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 2b. Request online status of specific users
+  socket.on('get_users_status', async (payload: { userIds: string[] }) => {
+    const { userIds } = payload;
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) return;
+
+    // Limit to prevent abuse (max 50 users at a time)
+    const idsToCheck = userIds.slice(0, 50);
+
+    try {
+      const statuses = await Promise.all(
+        idsToCheck.map(async (uid) => {
+          const isOnline = await isUserOnline(uid);
+          let lastSeenAt: Date | null = null;
+
+          if (!isOnline) {
+            // Get last seen from database
+            const user = await prisma.user.findUnique({
+              where: { id: uid },
+              select: { lastSeenAt: true },
+            });
+            lastSeenAt = user?.lastSeenAt || null;
+          }
+
+          return { userId: uid, isOnline, lastSeenAt };
+        })
+      );
+
+      socket.emit('users_status_response', { statuses });
+    } catch (error) {
+      console.error('[GET_USERS_STATUS] Error:', error);
+    }
+  });
+
   // 3. Handle Sending Messages (with media support)
   socket.on('send_message', async (payload) => {
     // Payload: { connectionId, content, tempId, mediaUrl?, mediaType?, mediaName?, mediaSize?, mediaThumbnail? }
