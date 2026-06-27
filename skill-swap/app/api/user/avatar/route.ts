@@ -53,7 +53,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert file to buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
 
     // Generate unique filename
     const timestamp = Date.now();
@@ -69,9 +70,13 @@ export async function POST(request: NextRequest) {
       });
 
     if (error) {
-      console.error('Supabase storage upload error:', error);
+      console.error('Supabase storage upload error:', {
+        message: error.message,
+        name: error.name,
+        status: (error as any).statusCode || (error as any).status,
+      });
       return NextResponse.json(
-        { error: 'Failed to upload image. Please try again.' },
+        { error: `Upload failed: ${error.message}` },
         { status: 500 }
       );
     }
@@ -110,7 +115,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error uploading avatar:', error);
     return NextResponse.json(
-      { error: 'Failed to upload avatar' },
+      { error: error instanceof Error ? error.message : 'Failed to upload avatar' },
       { status: 500 }
     );
   }
