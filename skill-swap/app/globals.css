@@ -244,7 +244,7 @@
 
 /* Content padding for pages with bottom nav on mobile */
 @media (max-width: 767px) {
-  main {
+  main:not(.no-bottom-padding) {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 }

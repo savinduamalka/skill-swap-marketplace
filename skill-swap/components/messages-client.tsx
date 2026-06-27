@@ -1582,8 +1582,8 @@ export function MessagesClient() {
     <>
       <Header />
 
-      <main className="pb-0">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 h-[calc(100dvh-128px)] md:h-[calc(100vh-200px)] flex flex-col md:flex-row gap-6">
+      <main className="pb-0 !pb-0 no-bottom-padding">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 h-[calc(100dvh-64px)] md:h-[calc(100vh-200px)] flex flex-col md:flex-row gap-6">
           {/* Conversation List Sidebar */}
           <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 md:border-r border-border`}>
             {/* Connection Status */}
@@ -2233,7 +2233,7 @@ export function MessagesClient() {
                 )}
                 
                 {/* Input Bar */}
-                <div className="p-4 flex gap-2 items-center">
+                <div className="p-3 md:p-4 flex gap-2 items-center border-t border-border bg-background">
                   {/* Hidden file input */}
                   <input
                     type="file"
@@ -2568,7 +2568,8 @@ export function MessagesClient() {
         />
       )}
 
-      <MobileNav />
+      {/* Hide mobile nav when a conversation is open on mobile (full-screen chat) */}
+      {!selectedConversation && <MobileNav />}
     </>
   );
 }
