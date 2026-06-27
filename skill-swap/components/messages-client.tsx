@@ -126,6 +126,7 @@ export function MessagesClient() {
     >
   >(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { markConversationAsRead, setCurrentOpenConversation } =
@@ -801,9 +802,12 @@ export function MessagesClient() {
     }
   };
 
-  // Load older messages
+  // Load older messages (triggered automatically on scroll up)
   const loadMoreMessages = async () => {
     if (!selectedConversation || !nextCursor || isLoadingMore) return;
+
+    const container = messagesContainerRef.current;
+    const prevScrollHeight = container?.scrollHeight || 0;
 
     setIsLoadingMore(true);
     try {
@@ -819,6 +823,14 @@ export function MessagesClient() {
       setMessages((prev) => [...data.messages, ...prev]);
       setHasMoreMessages(data.hasMore || false);
       setNextCursor(data.nextCursor || null);
+
+      // Preserve scroll position after older messages are prepended
+      requestAnimationFrame(() => {
+        if (container) {
+          const newScrollHeight = container.scrollHeight;
+          container.scrollTop = newScrollHeight - prevScrollHeight;
+        }
+      });
     } catch (error) {
       console.error('Error loading more messages:', error);
     } finally {
@@ -2025,26 +2037,25 @@ export function MessagesClient() {
               )}
 
               {/* Message History */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Load More (older messages) */}
-                {hasMoreMessages && !showChatSearch && (
-                  <div className="flex justify-center py-2">
-                    {isLoadingMore ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading older messages...
+              <div
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-4 space-y-4"
+                onScroll={(e) => {
+                  const target = e.currentTarget;
+                  // Trigger load more when scrolled near the top (100px threshold)
+                  if (target.scrollTop < 100 && hasMoreMessages && !isLoadingMore && !showChatSearch) {
+                    loadMoreMessages();
+                  }
+                }}
+              >
+                {/* Loading skeleton for older messages */}
+                {isLoadingMore && (
+                  <div className="space-y-3 py-2">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+                        <Skeleton className={`h-10 ${i % 2 === 0 ? 'w-48' : 'w-36'} rounded-xl`} />
                       </div>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={loadMoreMessages}
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        <ChevronUp className="w-4 h-4 mr-1" />
-                        Load older messages
-                      </Button>
-                    )}
+                    ))}
                   </div>
                 )}
 
