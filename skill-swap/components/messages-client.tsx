@@ -1256,10 +1256,9 @@ export function MessagesClient() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Auto-focus input when conversation is selected or when component mounts with a conversation
+  // Auto-focus input when conversation is selected (desktop only)
   useEffect(() => {
-    if (selectedConversation && inputRef.current) {
-      // Small delay to ensure DOM is ready
+    if (selectedConversation && inputRef.current && window.innerWidth >= 768) {
       const timer = setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
@@ -1267,9 +1266,9 @@ export function MessagesClient() {
     }
   }, [selectedConversation]);
 
-  // Re-focus input after sending a message
+  // Re-focus input after sending a message (desktop only)
   useEffect(() => {
-    if (selectedConversation && !isSending && inputRef.current) {
+    if (selectedConversation && !isSending && inputRef.current && window.innerWidth >= 768) {
       inputRef.current.focus();
     }
   }, [isSending, selectedConversation]);
