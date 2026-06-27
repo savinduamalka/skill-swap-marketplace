@@ -84,7 +84,7 @@ graph TD
     Storage[("Supabase Storage<br/>media bucket")]
     LiveKit["LiveKit Cloud / SFU<br/>(video + audio)"]
     LLM["xAI Grok<br/>(OpenAI-compatible API)"]
-    Email["Brevo<br/>(transactional email)"]
+    Email["Resend<br/>(transactional email)"]
 
     Browser -->|HTTPS| Pages
     Browser -->|fetch JSON| REST
@@ -218,7 +218,7 @@ Skill-Swap/Code/
 - **NextAuth v5 (beta)** — `next-auth@5.0.0-beta.30` with `@auth/prisma-adapter`
 - **Prisma 7** (`@prisma/client`, `@prisma/adapter-pg`) over **node-postgres (`pg`)**
 - **bcryptjs** (password hashing), **jsonwebtoken** (socket token), **uuid**
-- **nodemailer** is installed; transactional reset email is sent via the **Brevo** REST API
+- **Resend** (`resend@6.16.0`) for transactional emails (password reset, connection request, message notifications) with branded HTML templates
 
 ### WebSocket / Real-time
 - **Socket.IO 4** server (`socket.io`) and **socket.io-client** on the web app
@@ -255,8 +255,9 @@ Skill-Swap/Code/
 - Email/password registration with bcrypt hashing and email-format/length validation.
 - **OAuth** sign-in via **Google** and **Facebook** (NextAuth providers, with dangerous email account linking enabled).
 - JWT session strategy (30-day max age) for Edge-middleware compatibility.
-- Route protection through `middleware.ts` — public routes are `/`, `/login`, `/signup`; everything else requires authentication; logged-in users hitting `/login` or `/signup` are redirected to `/dashboard`.
-- Password reset flow: `forgot-password` (token + Brevo email) → `reset-password`.
+- Route protection through `middleware.ts` — public routes are `/`, `/login`, `/signup`, `/reset-password`; everything else requires authentication; logged-in users hitting `/login` or `/signup` are redirected to `/dashboard`.
+- Password reset flow via **Resend** with branded HTML email templates: `forgot-password` (token generation + rate limiting) → email delivery → `reset-password` page.
+- **Social login detection**: if a user who signed up via Google/Facebook tries to reset their password, the system detects the missing `passwordHash`, identifies the linked provider, and displays a helpful message directing them to use OAuth instead.
 - Change password, delete account.
 - New users automatically receive a **wallet with 100 credits** and an `INITIAL_ALLOCATION` transaction. OAuth users are auto-marked verified.
 
@@ -273,20 +274,27 @@ Skill-Swap/Code/
 
 ### Real-time Messaging
 - One-to-one chat scoped to an active connection.
+- **Cursor-based pagination** (50 messages per page) with infinite scroll — older messages load automatically as the user scrolls up, with scroll position preservation.
+- **In-chat search** that loads the full message pool (`?all=true`) for searching across the entire conversation history.
 - **Media attachments**: images, video, audio, and documents uploaded to Supabase Storage (per-type size limits up to 100 MB for video).
-- Read receipts, message deletion, and full conversation clearing — all mirrored to the other user in real time.
-- **Offers** embedded in chat (create offer, accept/decline) with real-time status updates.
+- Read receipts, message deletion (WhatsApp-style multi-select), and full conversation clearing — all mirrored to the other user in real time.
+- **Offers** embedded in chat (create offer, accept/decline/counter-offer) with real-time status updates.
 - Server-side **rate limiting** (5 messages/second/user via Redis).
 - Notification suppression when the recipient is actively viewing the conversation.
+- **Emoji picker** integration for rich message composition.
 
 ### Presence (enterprise-grade)
 - Online/offline tracking with **30s heartbeat**, **90s offline timeout**, and **1s debounce**.
 - Redis-backed global presence set so status is correct across multiple socket-server nodes.
+- **Presence subscription** (`get_users_status`): clients can request the current online status of specific users on demand (WhatsApp-style), ensuring accurate status display even if the user connected before the status broadcast.
 - `user_online_status` history table for analytics (device info, IP).
+- "Last seen X minutes ago" display with periodic refresh.
 
 ### Live Sessions (Video & Audio)
 - LiveKit-powered prebuilt video calls and a custom audio-call interface.
 - Call signaling (`call:initiate` → `call:incoming` / `call:accepted` / `call:rejected` / `call:ended`) relayed via Socket.IO, with offline-recipient detection.
+- **Ringtone** on incoming calls using the Web Audio API (two-tone ring pattern, stops on answer/reject).
+- Mobile-optimized call controls with safe-area inset handling for notched devices.
 - LiveKit token minting and webhook event logging (participant joined/left, room finished).
 
 ### Sessions & Reviews (credit settlement)
@@ -307,8 +315,23 @@ Skill-Swap/Code/
 - Generate a personalized, scope-aware, phased roadmap for any skill the user wants to learn (xAI Grok, strict JSON output, sanitized server-side).
 - Save, list, update progress (per-step completion), and archive roadmaps.
 
-### Notifications
-- Persistent notifications (connection/session requests, messages, reviews, post likes/comments) with seen/read states, unread count, and real-time delivery.
+### Notifications & Email Alerts
+- Persistent in-app notifications (connection/session requests, messages, reviews, post likes/comments) with seen/read states, unread count, and real-time delivery.
+- **Email notification system** via Resend with branded HTML templates:
+  - Connection request received → email with "View Request" CTA
+  - New message received (when receiver is offline) → email with message preview
+  - Password reset → email with secure token link
+- **Granular notification preferences** (master toggle + per-type: connection requests, session reminders, messages) persisted in the database and auto-saved from the settings UI.
+- Smart email delivery: only sends when the receiver is offline (not connected via WebSocket), preventing spam for active users.
+
+### UI/UX & Responsive Design
+- **Dark mode** support via `next-themes` with system preference detection.
+- **Animated landing page** with scroll-reveal animations, floating emojis, animated counters, SVG path draw effects, and feature showcase cards.
+- **Fully responsive** across all screen sizes — mobile-first approach with safe-area handling for notched devices.
+- Mobile-optimized chat: bottom nav hides when a conversation is open (full-screen chat experience), no auto-focus keyboard, proper viewport height (`100dvh`).
+- **shadcn/ui** component library built on Radix UI primitives for accessible, production-grade UI elements.
+- Skeleton loading states throughout the application for smooth perceived performance.
+- Toast notifications via Sonner for user feedback.
 
 ### User Workflow (typical journey)
 ```mermaid
@@ -336,7 +359,7 @@ flowchart LR
 - **pnpm** (lockfiles are pnpm; `corepack enable` recommended)
 - A **PostgreSQL** database (Supabase recommended — both services share the same `DATABASE_URL`)
 - A **Redis** instance (required by the socket server's adapter & presence; defaults to `redis://localhost:6379`)
-- Accounts/keys as needed: **Supabase** (URL + service role key + a `newsfeed-media` storage bucket), **Google/Facebook OAuth**, **LiveKit** (Cloud or self-hosted), **xAI** (LLM key), **Brevo** (optional, for reset emails)
+- Accounts/keys as needed: **Supabase** (URL + service role key + storage buckets), **Google/Facebook OAuth**, **LiveKit** (Cloud or self-hosted), **xAI** (LLM key), **Resend** (API key + verified domain for email notifications)
 
 > The two services are **separate npm packages**. Install and run them independently.
 
@@ -545,6 +568,13 @@ All routes below are under the Next.js app. Most require an authenticated NextAu
 | `POST` | `/api/notifications/read` | Mark notification(s) read. |
 | `POST` | `/api/notifications/seen` | Mark notification(s) seen. |
 | `GET` | `/api/notifications/unread-count` | Get unread count. |
+| `GET` | `/api/user/notifications/preferences` | Get email notification preferences. |
+| `PUT` | `/api/user/notifications/preferences` | Update email notification preferences. |
+
+### Internal (server-to-server)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/internal/email/notify` | `x-socket-secret` header | Send email notification for new messages (called by socket server). |
 
 ### Dashboard & LiveKit
 | Method | Endpoint | Description |
@@ -652,6 +682,7 @@ On connect, the server joins the socket to a room named after the user's `userId
 |-------|---------|---------|
 | `join_chat` | `connectionId: string` | Join a conversation room. |
 | `set_active_conversation` | `{ connectionId: string \| null }` | Suppress notifications for the open chat (stored in Redis, 12h TTL). |
+| `get_users_status` | `{ userIds: string[] }` | Request current online status of specific users (max 50). Server responds with `users_status_response`. |
 | `send_message` | `{ connectionId, content, tempId, mediaUrl?, mediaType?, mediaName?, mediaSize?, mediaThumbnail? }` | Send a message (validated, rate-limited 5/s, persisted). |
 | `mark_message_read` | `{ messageId, connectionId }` | Mark a message read; notifies the sender. |
 | `delete_messages` | `{ connectionId, messageIds, deletedBy }` | Notify the peer of deleted messages. |
@@ -674,6 +705,7 @@ On connect, the server joins the socket to a room named after the user's `userId
 | `offer_status_updated` | `{ messageId, connectionId, content }` | Offer status changed. |
 | `user_online_status` | `{ userId, isOnline, lastSeenAt, timestamp }` | A user came online. |
 | `user_offline_status` | `{ userId, isOnline, lastSeenAt, timestamp }` | A user went offline. |
+| `users_status_response` | `{ statuses: [{ userId, isOnline, lastSeenAt }] }` | Response to `get_users_status` request with current status of requested users. |
 | `notification:new` | `{ notification }` | New notification (from chat or internal HTTP). |
 | `call:incoming` | `{ callerId, callerName, callerImage, callType, roomName, connectionId, timestamp }` | Incoming call. |
 | `call:accepted` | `{ participantId, connectionId, timestamp }` | Callee accepted. |
@@ -779,8 +811,8 @@ pnpm exec prisma migrate dev        # local development
 | `LIVEKIT_API_SECRET` | For calls | LiveKit API secret. |
 | `LLM_API_KEY` | For AI roadmaps | xAI Grok API key. |
 | `LLM_MODEL` | See note | Model name for the LLM. **Note:** `lib/llm.ts` reads this with no fallback, so it is effectively required for roadmap generation even though `.env.example` describes it as optional. |
-| `BREVO_API_KEY` | Optional | Brevo API key for sending password-reset emails (referenced in code, **not** in `.env.example`). |
-| `BREVO_SENDER_EMAIL` | Optional | Verified Brevo sender address (referenced in code, **not** in `.env.example`). |
+| `RESEND_API_KEY` | Required | Resend API key for transactional emails (password reset, connection request notifications, message notifications). |
+| `RESEND_FROM_EMAIL` | Required | Verified sender address for Resend (e.g. `SkillSwap <noreply@yourdomain.com>`). |
 | `NODE_ENV` | Auto | Standard Node environment flag (affects error verbosity & Prisma global caching). |
 
 ### `socket-server` (WebSocket) — from code usage (no `.env.example` present)
@@ -802,7 +834,7 @@ pnpm exec prisma migrate dev        # local development
 2. Provision **Redis** for the socket server.
 3. Create the Supabase Storage bucket **`newsfeed-media`** (public read) for chat/newsfeed media.
 4. Deploy the **Next.js app** and the **socket server** as two separate services, each with its own environment variables. Ensure `SOCKET_SECRET` is identical in both and `NEXT_PUBLIC_SOCKET_URL` / `NEXTJS_URL` point at each other.
-5. Configure OAuth redirect URIs, LiveKit credentials, the LLM key, and (optionally) Brevo.
+5. Configure OAuth redirect URIs, LiveKit credentials, the LLM key, and **Resend** (API key + verified domain).
 6. If using LiveKit webhooks, point your LiveKit project's webhook at `POST /api/livekit/webhook`.
 
 ### Next.js app — Vercel
@@ -908,14 +940,14 @@ Discovered during analysis — worth addressing:
 1. **Broken migrations path in the socket server.** `socket-server/prisma.config.ts` points migrations to `'../Skill Swap/prisma/migrations'`, but the actual app folder is `skill-swap` (lowercase, hyphenated). Running migrations from the socket server would fail or drift. Migrations should be owned solely by the Next.js app, or this path corrected.
 2. **Duplicated Prisma schema.** The schema is copied into both `skill-swap/prisma` and `socket-server/prisma`. There's no automation keeping them in sync, so they can silently diverge. Consider a shared package or a copy step in CI.
 3. **No `.env.example` for the socket server.** Required env vars (`DATABASE_URL`, `SOCKET_SECRET`, `PORT`, `NEXTJS_URL`, `REDIS_URL`) are only discoverable by reading `server.ts`. Add a `socket-server/.env.example`.
-4. **Undocumented env vars in the app.** `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` are used by `forgot-password` but missing from `.env.example`; without them, password-reset emails silently don't send (only a console warning).
+4. **Duplicated Prisma schema.** The schema is maintained in both `skill-swap/prisma` and `socket-server/prisma`. Both must be kept in sync manually. Consider a shared package or a copy step in CI.
 5. **`LLM_MODEL` has no default.** `.env.example` calls it optional and mentions a default model, but `lib/llm.ts` sends `process.env.LLM_MODEL?.trim()` with no fallback. Either hardcode a sensible default or mark it required.
 6. **Empty/placeholder directories.** `app/api/skillfeed/**` contains nested folders with **no `route.ts`** files (appears to be a renamed/legacy alias of `newsfeed`), and `app/api/internal/email/` is empty. These should be removed or implemented to avoid confusion.
 7. **Unwired admin/moderation models.** `AdminLog` and `ReportedContent` exist in the schema but have no corresponding API routes or UI. Reporting/moderation is effectively not implemented yet.
 8. **No automated tests.** Neither package has a real test suite (`socket-server`'s `test` script just errors). The app's `package.json` has no `test` script at all. Consider adding unit/integration tests, especially around the credit-transaction logic.
 9. **No Docker or CI/CD.** There's no containerization or pipeline configuration, so builds, migrations, and deploys are manual.
 10. **Client/server event drift.** The client hook references `call:ice-candidate` and legacy `user_online`/`user_offline` events the current server doesn't emit. Harmless, but dead code worth pruning.
-11. **`nodemailer` installed but unused for sending.** Reset emails go through the Brevo REST API; `nodemailer` appears to be a leftover dependency.
+11. **`nodemailer` installed but unused.** Transactional emails are now handled entirely by the **Resend** SDK; `nodemailer` is a leftover dependency that can be removed.
 
 ---
 
