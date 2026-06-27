@@ -1860,7 +1860,7 @@ export function MessagesClient() {
                 </div>
               ) : (
               /* Chat Header */
-              <div className="flex items-center justify-between p-4 border-b border-border">
+              <div className="flex items-center justify-between p-3 md:p-4 border-b border-border shrink-0">
                 <div className="flex items-center gap-2">
                   <Button 
                     variant="ghost" 
@@ -2039,7 +2039,7 @@ export function MessagesClient() {
               {/* Message History */}
               <div
                 ref={messagesContainerRef}
-                className="flex-1 overflow-y-auto p-4 space-y-4"
+                className="flex-1 overflow-y-auto p-4 pb-2 space-y-4"
                 onScroll={(e) => {
                   const target = e.currentTarget;
                   // Trigger load more when scrolled near the top (100px threshold)
@@ -2284,7 +2284,7 @@ export function MessagesClient() {
                   );
                   })
                 )}
-                <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} className="h-2 shrink-0" />
               </div>
 
               {/* Message Input */}
@@ -2333,7 +2333,7 @@ export function MessagesClient() {
                 )}
                 
                 {/* Input Bar */}
-                <div className="p-3 md:p-4 flex gap-2 items-center border-t border-border bg-background">
+                <div className="p-3 md:p-4 flex gap-2 items-center border-t border-border bg-background shrink-0">
                   {/* Hidden file input */}
                   <input
                     type="file"
