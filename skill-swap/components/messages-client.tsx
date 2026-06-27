@@ -154,7 +154,7 @@ export function MessagesClient() {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const currentRoomNameRef = useRef<string>('');
-  const {
+  const ringtoneRef = useRef<{ stop: () => void } | null>(null);  const {
     isConnected,
     joinChat,
     sendMessage,
@@ -1574,6 +1574,63 @@ export function MessagesClient() {
 
     return unsubscribe;
   }, [onCallIncoming, selectedConversation, toast]);
+
+  // Play ringtone when incoming call is received, stop when state changes
+  useEffect(() => {
+    if (callState === 'incoming') {
+      // Create a ringtone using Web Audio API
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        let isPlaying = true;
+
+        const playRingtone = async () => {
+          while (isPlaying) {
+            // Play two tones (classic phone ring pattern)
+            for (let i = 0; i < 2 && isPlaying; i++) {
+              const oscillator = audioContext.createOscillator();
+              const gainNode = audioContext.createGain();
+              oscillator.connect(gainNode);
+              gainNode.connect(audioContext.destination);
+              oscillator.frequency.value = i === 0 ? 440 : 480;
+              gainNode.gain.value = 0.3;
+              oscillator.start();
+              await new Promise((r) => setTimeout(r, 400));
+              oscillator.stop();
+              if (!isPlaying) break;
+              await new Promise((r) => setTimeout(r, 100));
+            }
+            if (!isPlaying) break;
+            // Pause between rings
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+        };
+
+        playRingtone();
+
+        ringtoneRef.current = {
+          stop: () => {
+            isPlaying = false;
+            audioContext.close().catch(() => {});
+          },
+        };
+      } catch (err) {
+        console.error('Failed to play ringtone:', err);
+      }
+    } else {
+      // Stop ringtone when call state changes
+      if (ringtoneRef.current) {
+        ringtoneRef.current.stop();
+        ringtoneRef.current = null;
+      }
+    }
+
+    return () => {
+      if (ringtoneRef.current) {
+        ringtoneRef.current.stop();
+        ringtoneRef.current = null;
+      }
+    };
+  }, [callState]);
 
   // Listen for call rejection
   useEffect(() => {
