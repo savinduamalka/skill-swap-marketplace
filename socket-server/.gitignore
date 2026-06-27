@@ -30,6 +30,13 @@ lerna-debug.log*
 *.tsbuildinfo
 /lib/generated/prisma
 
+# Compiled output (root-level build artifacts)
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+!jest.config.js
+
 # Testing
 /coverage
 /.nyc_output
