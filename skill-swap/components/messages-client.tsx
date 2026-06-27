@@ -89,6 +89,9 @@ export function MessagesClient() {
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false);
@@ -697,9 +700,19 @@ export function MessagesClient() {
     }
   }, [selectedConversation?.id, setActiveConversation]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom only for new messages (not when loading older ones)
+  const prevMessageCountRef = useRef(0);
   useEffect(() => {
-    scrollToBottom();
+    // Only scroll to bottom if messages were added at the end (new message)
+    if (messages.length > prevMessageCountRef.current) {
+      const lastMsg = messages[messages.length - 1];
+      const prevLastMsg = prevMessageCountRef.current > 0 ? messages[prevMessageCountRef.current - 1] : null;
+      // If the new messages are at the end (newer), scroll down
+      if (!prevLastMsg || (lastMsg && new Date(lastMsg.createdAt) >= new Date(prevLastMsg.createdAt))) {
+        scrollToBottom();
+      }
+    }
+    prevMessageCountRef.current = messages.length;
   }, [messages]);
 
   // Periodically refresh the "last seen" display (every 30 seconds)
@@ -748,20 +761,22 @@ export function MessagesClient() {
     // Start loading immediately
     setIsLoadingMessages(true);
     setMessages([]); // Clear previous messages
+    setHasMoreMessages(false);
+    setNextCursor(null);
 
     try {
       const response = await fetch(`/api/messages/${connectionId}`);
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('API Error:', errorData);
         throw new Error(errorData.error || 'Failed to load messages');
       }
 
       const data = await response.json();
-      // Set conversation immediately so chat window appears with skeleton
       setSelectedConversation(data.connection);
       setMessages(data.messages);
+      setHasMoreMessages(data.hasMore || false);
+      setNextCursor(data.nextCursor || null);
 
       // Mark this conversation as read in the unread context
       markConversationAsRead(connectionId);
@@ -783,6 +798,51 @@ export function MessagesClient() {
       });
     } finally {
       setIsLoadingMessages(false);
+    }
+  };
+
+  // Load older messages
+  const loadMoreMessages = async () => {
+    if (!selectedConversation || !nextCursor || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      const response = await fetch(
+        `/api/messages/${selectedConversation.id}?cursor=${nextCursor}`
+      );
+
+      if (!response.ok) throw new Error('Failed to load older messages');
+
+      const data = await response.json();
+
+      // Prepend older messages to the beginning
+      setMessages((prev) => [...data.messages, ...prev]);
+      setHasMoreMessages(data.hasMore || false);
+      setNextCursor(data.nextCursor || null);
+    } catch (error) {
+      console.error('Error loading more messages:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // Load all messages for search (puts everything in one pool)
+  const loadAllMessagesForSearch = async () => {
+    if (!selectedConversation) return;
+
+    try {
+      const response = await fetch(
+        `/api/messages/${selectedConversation.id}?all=true`
+      );
+
+      if (!response.ok) throw new Error('Failed to load all messages');
+
+      const data = await response.json();
+      setMessages(data.messages);
+      setHasMoreMessages(false);
+      setNextCursor(null);
+    } catch (error) {
+      console.error('Error loading all messages for search:', error);
     }
   };
 
@@ -1892,7 +1952,14 @@ export function MessagesClient() {
                     size="icon"
                     variant={showChatSearch ? 'default' : 'ghost'}
                     title="Search in chat"
-                    onClick={() => setShowChatSearch(!showChatSearch)}
+                    onClick={() => {
+                      const newState = !showChatSearch;
+                      setShowChatSearch(newState);
+                      if (newState && hasMoreMessages) {
+                        // Load all messages so search covers the full history
+                        loadAllMessagesForSearch();
+                      }
+                    }}
                   >
                     <Search className="w-4 h-4" />
                   </Button>
@@ -1959,6 +2026,28 @@ export function MessagesClient() {
 
               {/* Message History */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Load More (older messages) */}
+                {hasMoreMessages && !showChatSearch && (
+                  <div className="flex justify-center py-2">
+                    {isLoadingMore ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading older messages...
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={loadMoreMessages}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <ChevronUp className="w-4 h-4 mr-1" />
+                        Load older messages
+                      </Button>
+                    )}
+                  </div>
+                )}
+
                 {isLoadingMessages ? (
                   <div className="space-y-4">
                     {/* Skeleton messages */}

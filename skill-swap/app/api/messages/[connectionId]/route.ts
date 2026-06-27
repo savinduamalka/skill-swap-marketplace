@@ -1,12 +1,23 @@
+/**
+ * Messages API Route
+ *
+ * GET  - Fetch paginated messages for a conversation (cursor-based)
+ * DELETE - Clear all messages in a conversation
+ *
+ * Pagination: Uses cursor-based pagination.
+ * - First request: returns latest N messages
+ * - Subsequent: pass ?cursor=<messageId> to load older messages
+ * - ?all=true: returns all messages (for search functionality)
+ *
+ * @fileoverview /api/messages/[connectionId]
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
-/**
- * GET /api/messages/[connectionId]
- * Fetch all messages for a specific conversation
- * Also marks unread messages as read
- */
+const MESSAGES_PER_PAGE = 50;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ connectionId: string }> }
@@ -21,23 +32,19 @@ export async function GET(
     const userId = (session.user as any).id;
     const { connectionId } = await params;
 
+    // Parse pagination params
+    const cursor = req.nextUrl.searchParams.get('cursor');
+    const loadAll = req.nextUrl.searchParams.get('all') === 'true';
+
     // Verify that the user is part of this connection
     const connection = await prisma.connection.findUnique({
       where: { id: connectionId },
       include: {
         user1: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-          },
+          select: { id: true, name: true, image: true },
         },
         user2: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-          },
+          select: { id: true, name: true, image: true },
         },
       },
     });
@@ -56,36 +63,70 @@ export async function GET(
       );
     }
 
-    // Fetch all messages for this connection
-    const messages = await prisma.message.findMany({
-      where: {
-        connectionId,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-          },
-        },
-      },
-    });
+    // Build query based on pagination mode
+    let messages;
 
-    // Mark all unread messages as read
-    await prisma.message.updateMany({
-      where: {
-        connectionId,
-        receiverId: userId,
-        isRead: false,
-      },
-      data: {
-        isRead: true,
-      },
-    });
+    if (loadAll) {
+      // Load all messages (used for in-chat search)
+      messages = await prisma.message.findMany({
+        where: { connectionId },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          sender: { select: { id: true, name: true, image: true } },
+        },
+      });
+    } else if (cursor) {
+      // Cursor-based: load older messages before the cursor
+      messages = await prisma.message.findMany({
+        where: { connectionId },
+        orderBy: { createdAt: 'desc' },
+        take: MESSAGES_PER_PAGE,
+        skip: 1, // Skip the cursor message itself
+        cursor: { id: cursor },
+        include: {
+          sender: { select: { id: true, name: true, image: true } },
+        },
+      });
+      // Reverse to chronological order
+      messages.reverse();
+    } else {
+      // Initial load: get the latest messages
+      messages = await prisma.message.findMany({
+        where: { connectionId },
+        orderBy: { createdAt: 'desc' },
+        take: MESSAGES_PER_PAGE,
+        include: {
+          sender: { select: { id: true, name: true, image: true } },
+        },
+      });
+      // Reverse to chronological order
+      messages.reverse();
+    }
+
+    // Mark unread messages as read (only on initial load or load-all)
+    if (!cursor) {
+      await prisma.message.updateMany({
+        where: {
+          connectionId,
+          receiverId: userId,
+          isRead: false,
+        },
+        data: { isRead: true },
+      });
+    }
+
+    // Determine if there are more (older) messages
+    let hasMore = false;
+    if (!loadAll && messages.length > 0) {
+      const oldestInBatch = messages[0];
+      const olderCount = await prisma.message.count({
+        where: {
+          connectionId,
+          createdAt: { lt: oldestInBatch.createdAt },
+        },
+      });
+      hasMore = olderCount > 0;
+    }
 
     // Determine the other user
     const otherUser =
@@ -109,25 +150,19 @@ export async function GET(
         createdAt: msg.createdAt,
         isRead: msg.isRead,
         isOwn: msg.senderId === userId,
-        // Media attachments
         mediaUrl: msg.mediaUrl,
         mediaType: msg.mediaType,
         mediaName: msg.mediaName,
         mediaSize: msg.mediaSize,
         mediaThumbnail: msg.mediaThumbnail,
       })),
+      hasMore,
+      nextCursor: !loadAll && messages.length > 0 ? messages[0].id : null,
     });
   } catch (error) {
     console.error('Error fetching messages:', error);
-    console.error(
-      'Stack trace:',
-      error instanceof Error ? error.stack : 'No stack trace'
-    );
     return NextResponse.json(
-      {
-        error: 'Failed to fetch messages',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { error: 'Failed to fetch messages' },
       { status: 500 }
     );
   }
@@ -135,7 +170,7 @@ export async function GET(
 
 /**
  * DELETE /api/messages/[connectionId]
- * Clear all messages in a conversation (delete entire chat history)
+ * Clear all messages in a conversation
  */
 export async function DELETE(
   req: NextRequest,
@@ -151,7 +186,6 @@ export async function DELETE(
     const userId = (session.user as any).id;
     const { connectionId } = await params;
 
-    // Verify that the user is part of this connection
     const connection = await prisma.connection.findUnique({
       where: { id: connectionId },
     });
@@ -170,11 +204,8 @@ export async function DELETE(
       );
     }
 
-    // Delete all messages in this conversation
     const result = await prisma.message.deleteMany({
-      where: {
-        connectionId,
-      },
+      where: { connectionId },
     });
 
     return NextResponse.json({
@@ -190,4 +221,3 @@ export async function DELETE(
     );
   }
 }
-
