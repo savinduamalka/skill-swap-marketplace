@@ -35,10 +35,12 @@ export default function PrebuiltVideoCall({
         serverUrl={serverUrl}
         connect
         data-lk-theme="default"
-        style={{ height: '100vh', width: '100vw' }}
+        style={{ height: '100dvh', width: '100vw' }}
         onDisconnected={onClose}
       >
-        <VideoConference />
+        <div className="h-[100dvh] w-full [&_.lk-control-bar]:pb-[env(safe-area-inset-bottom,8px)] [&_.lk-control-bar]:gap-2 [&_.lk-control-bar]:flex-wrap [&_.lk-control-bar]:justify-center">
+          <VideoConference />
+        </div>
       </LiveKitRoom>
     </div>
   );

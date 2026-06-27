@@ -138,6 +138,23 @@
   }
 }
 
+/* ===== LiveKit Video/Audio Call Mobile Fixes ===== */
+
+/* Ensure LiveKit control bar is visible on mobile */
+@media (max-width: 767px) {
+  .lk-control-bar {
+    padding-bottom: env(safe-area-inset-bottom, 8px) !important;
+    gap: 0.5rem !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+  }
+
+  .lk-control-bar button {
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+}
+
 /* ===== Landing Page Animations ===== */
 
 /* Floating emoji animation */

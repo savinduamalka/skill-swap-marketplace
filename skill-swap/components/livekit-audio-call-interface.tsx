@@ -80,7 +80,7 @@ function AudioCallContent({
       </div>
 
       {/* Control Bar */}
-      <div className="bg-slate-800 border-t border-slate-700 px-6 py-4 flex items-center justify-center gap-4 flex-shrink-0">
+      <div className="bg-slate-800 border-t border-slate-700 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] flex items-center justify-center gap-4 flex-shrink-0">
         {/* Mute Button */}
         <Button
           onClick={() => setIsMuted(!isMuted)}

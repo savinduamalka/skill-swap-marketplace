@@ -105,13 +105,13 @@ function RoomContent({
         </div>
 
         {/* BOTTOM CONTROLS - Floating "Island" Style */}
-        <div className="absolute bottom-0 left-0 right-0 z-30 pb-8 pt-12 px-4 bg-gradient-to-t from-black/80 to-transparent flex justify-center items-end pointer-events-none">
-          <div className="pointer-events-auto bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-full px-6 py-3 flex items-center gap-4 shadow-2xl">
+        <div className="absolute bottom-0 left-0 right-0 z-30 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-12 px-4 bg-gradient-to-t from-black/80 to-transparent flex justify-center items-end pointer-events-none">
+          <div className="pointer-events-auto bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-full px-4 sm:px-6 py-3 flex items-center gap-3 sm:gap-4 shadow-2xl">
             {/* Toggle Mic */}
             <Button
               onClick={() => setIsMuted(!isMuted)}
               size="icon"
-              className={`h-12 w-12 rounded-full transition-all duration-200 border-none ${
+              className={`h-11 w-11 sm:h-12 sm:w-12 rounded-full transition-all duration-200 border-none ${
                 isMuted
                   ? 'bg-white text-slate-900 hover:bg-slate-200'
                   : 'bg-white/10 text-white hover:bg-white/20'
@@ -129,7 +129,7 @@ function RoomContent({
               <Button
                 onClick={() => setIsVideoOff(!isVideoOff)}
                 size="icon"
-                className={`h-12 w-12 rounded-full transition-all duration-200 border-none ${
+                className={`h-11 w-11 sm:h-12 sm:w-12 rounded-full transition-all duration-200 border-none ${
                   isVideoOff
                     ? 'bg-white text-slate-900 hover:bg-slate-200'
                     : 'bg-white/10 text-white hover:bg-white/20'
@@ -147,7 +147,7 @@ function RoomContent({
             <Button
               onClick={onClose}
               size="icon"
-              className="h-14 w-14 rounded-full bg-red-500 hover:bg-red-600 text-white border-none shadow-lg scale-100 active:scale-95 transition-transform"
+              className="h-13 w-13 sm:h-14 sm:w-14 rounded-full bg-red-500 hover:bg-red-600 text-white border-none shadow-lg scale-100 active:scale-95 transition-transform"
             >
               <PhoneOff className="h-6 w-6" />
             </Button>
