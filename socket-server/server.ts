@@ -450,6 +450,27 @@ io.on('connection', (socket) => {
           });
 
           io.to(receiverId).emit('notification:new', { notification });
+
+          // Send email notification if receiver is offline
+          const isReceiverOnline = await isUserOnline(receiverId);
+          if (!isReceiverOnline) {
+            const nextjsUrl = process.env.NEXTJS_URL || 'http://localhost:3000';
+            fetch(`${nextjsUrl}/api/internal/email/notify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-socket-secret': process.env.SOCKET_SECRET || '',
+              },
+              body: JSON.stringify({
+                type: 'NEW_MESSAGE',
+                receiverId,
+                senderName,
+                messagePreview,
+              }),
+            }).catch((err) => {
+              console.error('[SEND_MESSAGE] Email notification error:', err);
+            });
+          }
         }
       } catch (error) {
         console.error('[SEND_MESSAGE] Notification error:', error);
