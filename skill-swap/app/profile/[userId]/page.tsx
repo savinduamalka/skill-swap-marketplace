@@ -46,6 +46,12 @@ interface UserProfile {
     availabilityWindow: string;
     alternativeNames: string | null;
   }[];
+  skillsWanted: {
+    id: string;
+    name: string;
+    description: string | null;
+    proficiencyTarget: string | null;
+  }[];
   reviewsReceived: {
     id: string;
     rating: number;
@@ -149,6 +155,15 @@ async function getUserProfile(userId: string): Promise<UserProfile | null> {
           },
           orderBy: { createdAt: 'desc' },
         },
+        skillsWanted: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            proficiencyTarget: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
         reviewsReceived: {
           select: {
             id: true,
@@ -196,6 +211,7 @@ async function getUserProfile(userId: string): Promise<UserProfile | null> {
       isVerified: user.isVerified,
       createdAt: user.createdAt,
       skills: user.skillsOffered,
+      skillsWanted: user.skillsWanted,
       reviewsReceived: user.reviewsReceived,
       _count: user._count,
     };
@@ -568,6 +584,33 @@ export default async function UserProfilePage({
               </p>
             )}
           </Card>
+
+          {/* Skills Wanted Section */}
+          {profile.skillsWanted.length > 0 && (
+            <Card className="p-6 mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <BookOpen className="h-5 w-5 text-secondary" />
+                <h2 className="text-lg font-semibold">Wants to Learn</h2>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {profile.skillsWanted.map((skill) => (
+                  <Badge
+                    key={skill.id}
+                    variant="outline"
+                    className="px-3 py-1.5 text-sm"
+                  >
+                    {skill.name}
+                    {skill.proficiencyTarget && (
+                      <span className="ml-1 text-muted-foreground">
+                        · {skill.proficiencyTarget}
+                      </span>
+                    )}
+                  </Badge>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Posts Section */}
           <ProfilePostsSection
