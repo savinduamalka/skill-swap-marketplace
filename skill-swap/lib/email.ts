@@ -140,3 +140,171 @@ export async function sendPasswordResetEmail(
     return { success: false, error: message };
   }
 }
+
+
+/**
+ * Generate connection request notification email HTML
+ */
+function getConnectionRequestTemplate(
+  senderName: string,
+  receiverName: string,
+  viewLink: string
+): string {
+  const content = `
+    <h2 style="margin: 0 0 16px; color: #111827; font-size: 22px; font-weight: 600;">
+      New Connection Request 🤝
+    </h2>
+    <p style="margin: 0 0 16px; color: #374151; font-size: 15px; line-height: 1.6;">
+      Hi ${receiverName},
+    </p>
+    <p style="margin: 0 0 24px; color: #374151; font-size: 15px; line-height: 1.6;">
+      <strong>${senderName}</strong> wants to connect with you on SkillSwap! They're interested in exchanging skills with you.
+    </p>
+    <!-- CTA Button -->
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+      <tr>
+        <td align="center" style="padding: 8px 0 32px;">
+          <a href="${viewLink}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.2px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">
+            View Request →
+          </a>
+        </td>
+      </tr>
+    </table>
+    <!-- Info Box -->
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+      <p style="margin: 0 0 8px; color: #166534; font-size: 13px; font-weight: 600;">
+        💡 What's next?
+      </p>
+      <p style="margin: 0; color: #14532d; font-size: 13px; line-height: 1.5;">
+        Accept the request to start chatting, schedule sessions, and exchange skills with ${senderName}. You can also decline if you're not interested.
+      </p>
+    </div>
+    <p style="margin: 0; color: #6b7280; font-size: 13px; text-align: center;">
+      You can manage your email notification preferences in your <a href="${viewLink.replace('/connections', '/settings')}" style="color: #2563eb; text-decoration: underline;">account settings</a>.
+    </p>
+  `;
+
+  return getBaseTemplate(content);
+}
+
+/**
+ * Send connection request notification email via Resend
+ *
+ * @param to - Recipient email address
+ * @param senderName - Name of the person who sent the request
+ * @param receiverName - Name of the person receiving the email
+ * @returns Success status and message ID or error
+ */
+export async function sendConnectionRequestEmail(
+  to: string,
+  senderName: string,
+  receiverName: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const viewLink = `${baseUrl}/connections`;
+
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [to],
+      subject: `${senderName} wants to connect with you on SkillSwap`,
+      html: getConnectionRequestTemplate(senderName, receiverName, viewLink),
+    });
+
+    if (error) {
+      console.error('[Email] Resend API error (connection request):', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[Email] Connection request email sent to ${to} (ID: ${data?.id})`);
+    return { success: true, messageId: data?.id };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown email error';
+    console.error('[Email] Failed to send connection request email:', message);
+    return { success: false, error: message };
+  }
+}
+
+
+/**
+ * Generate new message notification email HTML
+ */
+function getNewMessageTemplate(
+  senderName: string,
+  receiverName: string,
+  messagePreview: string,
+  viewLink: string
+): string {
+  const content = `
+    <h2 style="margin: 0 0 16px; color: #111827; font-size: 22px; font-weight: 600;">
+      New Message 💬
+    </h2>
+    <p style="margin: 0 0 16px; color: #374151; font-size: 15px; line-height: 1.6;">
+      Hi ${receiverName},
+    </p>
+    <p style="margin: 0 0 24px; color: #374151; font-size: 15px; line-height: 1.6;">
+      <strong>${senderName}</strong> sent you a message on SkillSwap:
+    </p>
+    <!-- Message Preview -->
+    <div style="background-color: #f9fafb; border-left: 4px solid #2563eb; border-radius: 4px; padding: 16px; margin-bottom: 24px;">
+      <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.5; font-style: italic;">
+        "${messagePreview}"
+      </p>
+    </div>
+    <!-- CTA Button -->
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+      <tr>
+        <td align="center" style="padding: 8px 0 32px;">
+          <a href="${viewLink}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.2px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">
+            Reply Now →
+          </a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin: 0; color: #6b7280; font-size: 13px; text-align: center;">
+      You can manage your email notification preferences in your <a href="${viewLink.replace('/messages', '/settings')}" style="color: #2563eb; text-decoration: underline;">account settings</a>.
+    </p>
+  `;
+
+  return getBaseTemplate(content);
+}
+
+/**
+ * Send new message notification email via Resend
+ *
+ * @param to - Recipient email address
+ * @param senderName - Name of the person who sent the message
+ * @param receiverName - Name of the person receiving the email
+ * @param messagePreview - Preview of the message content (truncated)
+ * @returns Success status and message ID or error
+ */
+export async function sendNewMessageEmail(
+  to: string,
+  senderName: string,
+  receiverName: string,
+  messagePreview: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const viewLink = `${baseUrl}/messages`;
+
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [to],
+      subject: `${senderName} sent you a message on SkillSwap`,
+      html: getNewMessageTemplate(senderName, receiverName, messagePreview, viewLink),
+    });
+
+    if (error) {
+      console.error('[Email] Resend API error (new message):', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[Email] New message email sent to ${to} (ID: ${data?.id})`);
+    return { success: true, messageId: data?.id };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown email error';
+    console.error('[Email] Failed to send new message email:', message);
+    return { success: false, error: message };
+  }
+}
