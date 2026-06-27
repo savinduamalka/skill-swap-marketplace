@@ -234,6 +234,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
 
   // Skills I Can Teach modal state
   const [isAddSkillOpen, setIsAddSkillOpen] = useState(false);
+  const [addSkillKey, setAddSkillKey] = useState(0);
   const [isEditSkillOpen, setIsEditSkillOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState<SkillOffered | null>(null);
   const [skillName, setSkillName] = useState('');
@@ -1067,6 +1068,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
                 size="sm"
                 onClick={() => {
                   resetSkillForm();
+                  setAddSkillKey((k) => k + 1);
                   setIsAddSkillOpen(true);
                 }}
               >
@@ -1285,7 +1287,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
 
         {/* Add Skill Modal */}
         <Dialog open={isAddSkillOpen} onOpenChange={setIsAddSkillOpen}>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogContent key={addSkillKey} className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Skill</DialogTitle>
               <DialogDescription>
