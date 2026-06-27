@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
+import { sendConnectionRequestEmail } from '@/lib/email';
 
 const CONNECTION_COST = 5;
 
@@ -48,7 +49,12 @@ export async function POST(request: NextRequest) {
     // Check if receiver exists
     const receiver = await prisma.user.findUnique({
       where: { id: receiverId },
-      select: { id: true, fullName: true, name: true },
+      select: {
+        id: true,
+        fullName: true,
+        name: true,
+        email: true,
+      },
     });
 
     if (!receiver) {
@@ -199,6 +205,15 @@ export async function POST(request: NextRequest) {
     }).catch((error) => {
       console.error('Failed to create connection request notification:', error);
     });
+
+    // Send email notification (fire-and-forget)
+    if (receiver.email) {
+      const receiverName = receiver.fullName || receiver.name || 'there';
+      sendConnectionRequestEmail(receiver.email, senderName, receiverName)
+        .catch((error) => {
+          console.error('[Connection Request] Email notification failed:', error);
+        });
+    }
 
     return NextResponse.json({
       success: true,
