@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import {
@@ -165,11 +165,72 @@ export function SettingsContent({ user }: SettingsContentProps) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  // Notification preferences
+  // Notification preferences (loaded from DB, auto-saved on change)
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [sessionReminders, setSessionReminders] = useState(true);
   const [newMatchNotifications, setNewMatchNotifications] = useState(true);
   const [messageNotifications, setMessageNotifications] = useState(true);
+  const [notifPrefsLoaded, setNotifPrefsLoaded] = useState(false);
+
+  // Load notification preferences from the server on mount
+  useEffect(() => {
+    async function loadNotificationPrefs() {
+      try {
+        const res = await fetch('/api/user/notifications/preferences');
+        if (res.ok) {
+          const data = await res.json();
+          setEmailNotifications(data.notifyEmail);
+          setSessionReminders(data.notifySessionReminder);
+          setNewMatchNotifications(data.notifyConnectionReq);
+          setMessageNotifications(data.notifyMessages);
+        }
+      } catch (err) {
+        console.error('Failed to load notification preferences:', err);
+      } finally {
+        setNotifPrefsLoaded(true);
+      }
+    }
+    loadNotificationPrefs();
+  }, []);
+
+  // Auto-save notification preferences when any toggle changes
+  const saveNotificationPref = async (field: string, value: boolean) => {
+    try {
+      const res = await fetch('/api/user/notifications/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error('Save preference error:', data);
+        throw new Error(data.error || 'Failed to save preference');
+      }
+    } catch (err) {
+      console.error('Failed to save notification preference:', err);
+      toast.error('Failed to save notification setting. Please try again.');
+    }
+  };
+
+  const handleEmailNotificationsChange = (value: boolean) => {
+    setEmailNotifications(value);
+    saveNotificationPref('notifyEmail', value);
+  };
+
+  const handleSessionRemindersChange = (value: boolean) => {
+    setSessionReminders(value);
+    saveNotificationPref('notifySessionReminder', value);
+  };
+
+  const handleConnectionReqChange = (value: boolean) => {
+    setNewMatchNotifications(value);
+    saveNotificationPref('notifyConnectionReq', value);
+  };
+
+  const handleMessageNotificationsChange = (value: boolean) => {
+    setMessageNotifications(value);
+    saveNotificationPref('notifyMessages', value);
+  };
 
   // Skills I Can Teach modal state
   const [isAddSkillOpen, setIsAddSkillOpen] = useState(false);
@@ -1696,10 +1757,16 @@ export function SettingsContent({ user }: SettingsContentProps) {
               </div>
               <Switch
                 checked={emailNotifications}
-                onCheckedChange={setEmailNotifications}
+                onCheckedChange={handleEmailNotificationsChange}
               />
             </div>
+            {!emailNotifications && (
+              <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-md">
+                All email notifications are currently disabled. Turn on the master toggle above to configure individual preferences.
+              </p>
+            )}
             <Separator />
+            <div className={`space-y-6 ${!emailNotifications ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>Session Reminders</Label>
@@ -1709,7 +1776,8 @@ export function SettingsContent({ user }: SettingsContentProps) {
               </div>
               <Switch
                 checked={sessionReminders}
-                onCheckedChange={setSessionReminders}
+                onCheckedChange={handleSessionRemindersChange}
+                disabled={!emailNotifications}
               />
             </div>
             <Separator />
@@ -1722,7 +1790,8 @@ export function SettingsContent({ user }: SettingsContentProps) {
               </div>
               <Switch
                 checked={newMatchNotifications}
-                onCheckedChange={setNewMatchNotifications}
+                onCheckedChange={handleConnectionReqChange}
+                disabled={!emailNotifications}
               />
             </div>
             <Separator />
@@ -1735,8 +1804,10 @@ export function SettingsContent({ user }: SettingsContentProps) {
               </div>
               <Switch
                 checked={messageNotifications}
-                onCheckedChange={setMessageNotifications}
+                onCheckedChange={handleMessageNotificationsChange}
+                disabled={!emailNotifications}
               />
+            </div>
             </div>
           </CardContent>
         </Card>
