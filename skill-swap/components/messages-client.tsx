@@ -174,7 +174,6 @@ export function MessagesClient() {
     sendIceCandidate,
     rejectCall,
     endCall,
-    emitCallMissed,
     setActiveConversation,
     requestUsersStatus,
     reconnect,
@@ -400,15 +399,12 @@ export function MessagesClient() {
           senderImage: selectedConversation.otherUser.image,
           createdAt: socketMessage.createdAt,
           isRead: socketMessage.isRead,
-          isOwn: socketMessage.senderId === session?.user?.id,
+          isOwn: false,
           mediaUrl: socketMessage.mediaUrl,
           mediaType: socketMessage.mediaType,
           mediaName: socketMessage.mediaName,
           mediaSize: socketMessage.mediaSize,
           mediaThumbnail: socketMessage.mediaThumbnail,
-          messageType: socketMessage.messageType as Message['messageType'],
-          callDuration: socketMessage.callDuration ?? undefined,
-          callType: socketMessage.callType as Message['callType'],
         };
 
         setMessages((prev) => {
@@ -418,10 +414,8 @@ export function MessagesClient() {
           return [...prev, newMessage];
         });
 
-        // Automatically mark message as read (skip call event messages)
-        if (!socketMessage.messageType) {
-          markMessageAsRead(socketMessage.id, socketMessage.connectionId);
-        }
+        // Automatically mark message as read
+        markMessageAsRead(socketMessage.id, socketMessage.connectionId);
         scrollToBottom();
       } else {
         // Update unread count for the conversation
@@ -436,7 +430,7 @@ export function MessagesClient() {
     });
 
     return unsubscribe;
-  }, [onMessageReceived, selectedConversation, markMessageAsRead, session?.user?.id]);
+  }, [onMessageReceived, selectedConversation, markMessageAsRead]);
 
   // Listen for message sent confirmation
   useEffect(() => {
@@ -1474,10 +1468,10 @@ export function MessagesClient() {
     rejectCall({
       callerId: incomingCallData.callerId,
       connectionId: incomingCallData.connectionId,
-      callType: incomingCallData.callType || 'video',
     });
 
-    // Call message will be persisted and received via socket from server
+    // Add declined call message to chat
+    addCallMessage('call_declined', false, undefined, incomingCallData.callType || 'video');
 
     setIncomingCallData(null);
     setCallState('idle');
@@ -1485,7 +1479,7 @@ export function MessagesClient() {
       title: 'Call Rejected',
       description: 'You rejected the call',
     });
-  }, [incomingCallData, rejectCall, toast]);
+  }, [incomingCallData, rejectCall, toast, addCallMessage]);
 
   // Handle ending active call
   const handleEndCall = useCallback(() => {
@@ -1493,23 +1487,24 @@ export function MessagesClient() {
     const otherParticipantId =
       incomingCallData?.callerId || selectedConversation?.otherUser.id;
 
+    if (otherParticipantId) {
+      endCall({
+        participantId: otherParticipantId,
+        connectionId:
+          currentRoomNameRef.current || selectedConversation?.id || '',
+      });
+    }
+
     // Calculate call duration if call was active
     let duration: number | undefined;
     if (callStartTime) {
       duration = Math.floor((new Date().getTime() - callStartTime.getTime()) / 1000);
     }
 
-    if (otherParticipantId) {
-      endCall({
-        participantId: otherParticipantId,
-        connectionId:
-          currentRoomNameRef.current || selectedConversation?.id || '',
-        duration,
-        callType,
-      });
+    // Add call ended message with duration
+    if (callState === 'active' && duration !== undefined) {
+      addCallMessage('call_ended', true, duration, callType);
     }
-
-    // Call message will be persisted and received via socket from server
 
     setCallState('idle');
     setLiveKitToken('');
@@ -1521,7 +1516,7 @@ export function MessagesClient() {
       title: 'Call Ended',
       description: duration ? `Call duration: ${formatCallDuration(duration)}` : 'The call has been ended',
     });
-  }, [incomingCallData, selectedConversation, endCall, toast, callStartTime, callType]);
+  }, [incomingCallData, selectedConversation, endCall, toast, callStartTime, callState, callType, addCallMessage]);
 
   // Handle cancel outgoing call (no answer / missed)
   const handleCancelCall = useCallback(() => {
@@ -1531,16 +1526,10 @@ export function MessagesClient() {
         callerId: selectedConversation.otherUser.id, // Notify the receiver
         connectionId: selectedConversation.id,
       });
-
-      // Emit missed call event to persist in database
-      emitCallMissed({
-        recipientId: selectedConversation.otherUser.id,
-        connectionId: selectedConversation.id,
-        callType,
-      });
     }
 
-    // Call message will be persisted and received via socket from server
+    // Add missed call message (outgoing call that wasn't answered)
+    addCallMessage('call_missed', true, undefined, callType);
 
     setCallState('idle');
     setLiveKitToken('');
@@ -1551,7 +1540,7 @@ export function MessagesClient() {
       title: 'Call Cancelled',
       description: 'No answer',
     });
-  }, [selectedConversation, rejectCall, emitCallMissed, toast, callType]);
+  }, [selectedConversation, rejectCall, toast, callType, addCallMessage]);
 
   // Listen for call acceptance (receiver accepted, sender transitions to active)
   useEffect(() => {
@@ -1646,7 +1635,8 @@ export function MessagesClient() {
   // Listen for call rejection
   useEffect(() => {
     const unsubscribe = onCallRejected((data) => {
-      // Call declined message will arrive via receive_message from server
+      // Add declined call message when other user rejects
+      addCallMessage('call_declined', true, undefined, callType);
       
       setCallState('idle');
       setLiveKitToken('');
@@ -1661,15 +1651,17 @@ export function MessagesClient() {
     });
 
     return unsubscribe;
-  }, [onCallRejected, toast]);
+  }, [onCallRejected, toast, addCallMessage, callType]);
 
   // Listen for call ending (when other party ends the call)
   useEffect(() => {
     const unsubscribe = onCallEnded((data) => {
-      // Call ended message will arrive via receive_message from server
+      // Calculate call duration if we were in an active call
       let duration: number | undefined;
       if (callStartTime) {
         duration = Math.floor((new Date().getTime() - callStartTime.getTime()) / 1000);
+        // Add call ended message
+        addCallMessage('call_ended', false, duration, callType);
       }
 
       setCallState('idle');
@@ -1686,7 +1678,7 @@ export function MessagesClient() {
     });
 
     return unsubscribe;
-  }, [onCallEnded, callStartTime, toast]);
+  }, [onCallEnded, callStartTime, callType, addCallMessage, toast]);
 
   if (isLoadingConversations) {
     return (

@@ -311,11 +311,6 @@ model Message {
   mediaSize             Int?      // File size in bytes
   mediaThumbnail        String?   // Thumbnail URL for images/videos
 
-  // Call event fields
-  messageType           String?   // "call_missed" | "call_declined" | "call_ended"
-  callDuration          Int?      // Duration in seconds for ended calls
-  callType              String?   // "audio" | "video"
-
   // Relations
   connection            Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   sender                User      @relation("SentBy", fields: [senderId], references: [id], onDelete: Cascade)
