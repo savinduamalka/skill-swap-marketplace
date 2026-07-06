@@ -144,7 +144,7 @@ export function NotificationsMenu() {
           )}
         </div>
 
-        <ScrollArea className="max-h-96">
+        <ScrollArea className="h-[400px]">
           <div className="p-3 space-y-2">
             {isLoading && notifications.length === 0 && (
               <div className="space-y-3">
