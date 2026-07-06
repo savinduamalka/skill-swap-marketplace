@@ -141,6 +141,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     socketRef.current.emit('call:reject', {
       callerId: incomingCall.callerId,
       connectionId: incomingCall.connectionId,
+      callType: incomingCall.callType || 'video',
     });
 
     setIncomingCall(null);
