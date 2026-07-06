@@ -86,20 +86,20 @@ export function NotificationsList() {
                 onClick={() => markAsRead(notification.id)}
               >
                 <Card
-                  className={`p-4 transition ${
+                  className={`p-4 transition overflow-hidden ${
                     isUnread ? 'bg-primary/5' : 'bg-background'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p
-                        className={`text-sm ${
+                        className={`text-sm truncate ${
                           isUnread ? 'font-semibold' : 'font-medium'
                         }`}
                       >
                         {notification.title}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 break-words">
                         {notification.message}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
@@ -107,7 +107,7 @@ export function NotificationsList() {
                       </p>
                     </div>
                     {isUnread && (
-                      <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
                     )}
                   </div>
                 </Card>
