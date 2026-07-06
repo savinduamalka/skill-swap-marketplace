@@ -68,6 +68,10 @@ export interface SocketMessage {
   mediaName?: string | null;
   mediaSize?: number | null;
   mediaThumbnail?: string | null;
+  // Call event fields
+  messageType?: string | null;
+  callDuration?: number | null;
+  callType?: string | null;
 }
 
 export interface SendMessagePayload {

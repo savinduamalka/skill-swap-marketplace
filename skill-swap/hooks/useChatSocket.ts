@@ -636,7 +636,7 @@ export const useChatSocket = () => {
   );
 
   const rejectCall = useCallback(
-    (payload: { callerId: string; connectionId: string }) => {
+    (payload: { callerId: string; connectionId: string; callType?: string }) => {
       if (socketRef.current?.connected) {
         socketRef.current.emit('call:reject', payload);
       }
@@ -645,9 +645,19 @@ export const useChatSocket = () => {
   );
 
   const endCall = useCallback(
-    (payload: { participantId: string; connectionId: string }) => {
+    (payload: { participantId: string; connectionId: string; duration?: number; callType?: string }) => {
       if (socketRef.current?.connected) {
         socketRef.current.emit('call:end', payload);
+      }
+    },
+    []
+  );
+
+  // Emit missed call event (caller cancelled before recipient answered)
+  const emitCallMissed = useCallback(
+    (payload: { recipientId: string; connectionId: string; callType?: string }) => {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('call:missed', payload);
       }
     },
     []
@@ -748,6 +758,7 @@ export const useChatSocket = () => {
     sendIceCandidate,
     rejectCall,
     endCall,
+    emitCallMissed,
     reconnect,
     // Message deletion
     notifyMessagesDeleted,

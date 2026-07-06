@@ -694,9 +694,37 @@ io.on('connection', (socket) => {
   });
 
   // Reject call (notify caller)
-  socket.on('call:reject', (payload) => {
-    const { callerId, connectionId } = payload;
+  socket.on('call:reject', async (payload) => {
+    const { callerId, connectionId, callType: rejectCallType } = payload;
     console.log(`[CALL] ${userId} rejected call from ${callerId}`);
+
+    // Persist the declined call event to the database
+    try {
+      const connection = await prisma.connection.findUnique({
+        where: { id: connectionId },
+      });
+
+      if (connection) {
+        const callIcon = rejectCallType === 'audio' ? '📞' : '📹';
+        const savedMessage = await prisma.message.create({
+          data: {
+            connectionId,
+            senderId: callerId,
+            receiverId: userId,
+            content: `${callIcon} Call declined`,
+            isRead: false,
+            messageType: 'call_declined',
+            callType: rejectCallType || 'video',
+          },
+        });
+
+        // Emit the saved message to both users so it appears in their chat
+        io.to(callerId).emit('receive_message', savedMessage);
+        io.to(userId).emit('receive_message', savedMessage);
+      }
+    } catch (error) {
+      console.error('[CALL] Error persisting declined call:', error);
+    }
 
     // Notify the caller (the person who initiated the call) that the callee rejected
     io.to(callerId).emit('call:rejected', {
@@ -714,9 +742,44 @@ io.on('connection', (socket) => {
   });
 
   // End call (notify other participant)
-  socket.on('call:end', (payload) => {
-    const { participantId, connectionId } = payload;
+  socket.on('call:end', async (payload) => {
+    const { participantId, connectionId, duration, callType: endCallType } = payload;
     console.log(`[CALL] ${userId} ended call with ${participantId}`);
+
+    // Persist the call ended event to the database
+    try {
+      const connection = await prisma.connection.findUnique({
+        where: { id: connectionId },
+      });
+
+      if (connection && duration !== undefined && duration > 0) {
+        const callIcon = endCallType === 'audio' ? '📞' : '📹';
+        const minutes = Math.floor(duration / 60);
+        const seconds = duration % 60;
+        const durationStr = minutes > 0 
+          ? `${minutes}m ${seconds}s` 
+          : `${seconds}s`;
+        
+        const savedMessage = await prisma.message.create({
+          data: {
+            connectionId,
+            senderId: userId,
+            receiverId: participantId,
+            content: `${callIcon} Call ended • ${durationStr}`,
+            isRead: false,
+            messageType: 'call_ended',
+            callDuration: duration,
+            callType: endCallType || 'video',
+          },
+        });
+
+        // Emit to both participants
+        io.to(participantId).emit('receive_message', savedMessage);
+        io.to(userId).emit('receive_message', savedMessage);
+      }
+    } catch (error) {
+      console.error('[CALL] Error persisting call ended:', error);
+    }
 
     if (participantId) {
       // Notify the other participant that the call ended
@@ -733,6 +796,40 @@ io.on('connection', (socket) => {
       connectionId,
       timestamp: new Date(),
     });
+  });
+
+  // Handle missed call (caller cancelled before recipient answered)
+  socket.on('call:missed', async (payload) => {
+    const { recipientId, connectionId, callType: missedCallType } = payload;
+    console.log(`[CALL] ${userId} cancelled call to ${recipientId} (missed)`);
+
+    // Persist the missed call event to the database
+    try {
+      const connection = await prisma.connection.findUnique({
+        where: { id: connectionId },
+      });
+
+      if (connection) {
+        const callIcon = missedCallType === 'audio' ? '📞' : '📹';
+        const savedMessage = await prisma.message.create({
+          data: {
+            connectionId,
+            senderId: userId,
+            receiverId: recipientId,
+            content: `${callIcon} Missed call`,
+            isRead: false,
+            messageType: 'call_missed',
+            callType: missedCallType || 'video',
+          },
+        });
+
+        // Emit to both users
+        io.to(recipientId).emit('receive_message', savedMessage);
+        io.to(userId).emit('receive_message', savedMessage);
+      }
+    } catch (error) {
+      console.error('[CALL] Error persisting missed call:', error);
+    }
   });
 
   socket.on('disconnect', () => {
