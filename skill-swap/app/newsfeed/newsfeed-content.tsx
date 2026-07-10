@@ -320,6 +320,19 @@ export function NewsfeedContent({
    * Toggle like on a post
    */
   const handleLike = async (postId: string) => {
+    // Optimistic update — flip immediately, don't wait for server
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              isLiked: !post.isLiked,
+              likesCount: post.isLiked ? post.likesCount - 1 : post.likesCount + 1,
+            }
+          : post
+      )
+    );
+
     try {
       const response = await fetch(`/api/newsfeed/${postId}/like`, {
         method: 'POST',
@@ -329,6 +342,7 @@ export function NewsfeedContent({
 
       const data = await response.json();
 
+      // Sync with server truth (in case of race condition)
       setPosts((prev) =>
         prev.map((post) =>
           post.id === postId
@@ -337,7 +351,18 @@ export function NewsfeedContent({
         )
       );
     } catch (error) {
-      console.error('Error toggling like:', error);
+      // Revert optimistic update on failure
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                isLiked: !post.isLiked,
+                likesCount: post.isLiked ? post.likesCount - 1 : post.likesCount + 1,
+              }
+            : post
+        )
+      );
     }
   };
 

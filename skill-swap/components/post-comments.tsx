@@ -124,10 +124,30 @@ export function PostComments({
   };
 
   const handleLikeComment = async (commentId: string, isReply = false, parentId?: string) => {
+    // Optimistic update first
+    const updateLike = (c: Comment) => ({
+      ...c,
+      isLiked: !c.isLiked,
+      likesCount: c.isLiked ? c.likesCount - 1 : c.likesCount + 1,
+    });
+
+    if (isReply && parentId) {
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === parentId
+            ? { ...c, replies: (c.replies || []).map((r) => r.id === commentId ? updateLike(r) : r) }
+            : c
+        )
+      );
+    } else {
+      setComments((prev) => prev.map((c) => c.id === commentId ? updateLike(c) : c));
+    }
+
     try {
       const response = await fetch(`/api/newsfeed/${postId}/comments/${commentId}/like`, { method: 'POST' });
       if (response.ok) {
         const { isLiked, likesCount } = await response.json();
+        // Sync with server truth
         if (isReply && parentId) {
           setComments((prev) =>
             prev.map((c) =>
@@ -141,7 +161,18 @@ export function PostComments({
         }
       }
     } catch (error) {
-      // Silently fail if comment_likes table doesn't exist yet
+      // Revert on failure
+      if (isReply && parentId) {
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === parentId
+              ? { ...c, replies: (c.replies || []).map((r) => r.id === commentId ? updateLike(r) : r) }
+              : c
+          )
+        );
+      } else {
+        setComments((prev) => prev.map((c) => c.id === commentId ? updateLike(c) : c));
+      }
     }
   };
 
