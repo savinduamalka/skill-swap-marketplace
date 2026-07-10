@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(
   request: NextRequest,
@@ -18,7 +19,7 @@ export async function POST(
     // Check if post exists
     const post = await prisma.newsfeedPost.findUnique({
       where: { id: postId },
-      select: { id: true },
+      select: { id: true, authorId: true },
     });
 
     if (!post) {
@@ -52,6 +53,20 @@ export async function POST(
         },
       });
       isLiked = true;
+
+      // Notify the post author (don't notify if liking own post)
+      if (post.authorId !== session.user.id) {
+        const likerName = session.user.name || 'Someone';
+        createNotification({
+          userId: post.authorId,
+          type: 'POST_LIKE',
+          title: 'Someone liked your post',
+          message: `${likerName} liked your post.`,
+          relatedUserId: session.user.id,
+          relatedEntityId: postId,
+          relatedEntityType: 'post',
+        }).catch(console.error);
+      }
     }
 
     // Get updated like count
