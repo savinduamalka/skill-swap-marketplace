@@ -125,6 +125,7 @@ model User {
   newsfeedPosts         NewsfeedPost[]            @relation("Author")
   postLikes             PostLike[]
   postComments          PostComment[]             @relation("Commenter")
+  commentLikes          CommentLike[]
   savedPosts            SavedPost[]
   notifications         Notification[]
   searchHistory         SearchHistory[]
@@ -501,16 +502,37 @@ model PostComment {
   postId                String
   commenterId           String
   content               String
+  parentId              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   // Relations
   post                  NewsfeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   commenter             User      @relation("Commenter", fields: [commenterId], references: [id], onDelete: Cascade)
+  parent                PostComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies               PostComment[] @relation("CommentReplies")
+  likes                 CommentLike[]
 
   @@index([postId])
   @@index([commenterId])
+  @@index([parentId])
   @@map("post_comments")
+}
+
+model CommentLike {
+  id                    String    @id @default(cuid())
+  commentId             String
+  userId                String
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  comment               PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([commentId])
+  @@index([userId])
+  @@map("comment_likes")
 }
 
 model SavedPost {
