@@ -353,7 +353,7 @@ export function RoadmapContent({
                   roadmap.
                 </p>
                 <Button variant="outline" asChild>
-                  <a href="/settings">
+                  <a href="/settings?tab=skills">
                     <Plus className="h-4 w-4 mr-2" />
                     Add a learning goal
                   </a>

@@ -57,8 +57,13 @@ async function getUserSettings(userId: string) {
   }
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const session = await auth();
+  const { tab } = await searchParams;
 
   if (!session?.user?.id) {
     redirect('/login');
@@ -89,9 +94,9 @@ export default async function SettingsPage() {
           <SettingsContent
             user={{
               ...user,
-              // Don't expose passwordHash to client, just whether it exists
               hasPassword: !!user.passwordHash,
             }}
+            defaultTab={tab}
           />
         </div>
       </main>

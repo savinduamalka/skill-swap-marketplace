@@ -119,6 +119,7 @@ interface UserData {
 
 interface SettingsContentProps {
   user: UserData;
+  defaultTab?: string;
 }
 
 // Time zones list
@@ -142,7 +143,7 @@ const TIME_ZONES = [
   { value: 'Pacific/Auckland', label: 'Auckland (NZST)' },
 ];
 
-export function SettingsContent({ user }: SettingsContentProps) {
+export function SettingsContent({ user, defaultTab }: SettingsContentProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -748,7 +749,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
   };
 
   return (
-    <Tabs defaultValue="account" className="space-y-6">
+    <Tabs defaultValue={defaultTab || 'account'} className="space-y-6">
       <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
         <TabsTrigger value="account" className="flex items-center gap-2">
           <User className="h-4 w-4" />
