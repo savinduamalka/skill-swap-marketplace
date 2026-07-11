@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
   try {
@@ -98,6 +99,17 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+
+    // Notify the sender that their request was declined
+    const declinedByName = session.user.name || 'Someone';
+    createNotification({
+      userId: senderId,
+      type: 'CONNECTION_DECLINED',
+      title: 'Connection request declined',
+      message: `${declinedByName} declined your connection request. Your credits have been refunded.`,
+      relatedUserId: receiverId,
+      relatedEntityType: 'connection_request',
+    }).catch(console.error);
 
     return NextResponse.json({
       success: true,

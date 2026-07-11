@@ -467,43 +467,25 @@ io.on('connection', (socket) => {
       // This will route to the correct server if the receiver is connected there.
       io.to(receiverId).emit('receive_message', newMessage);
 
-      // C. Create notification if receiver is not actively viewing this conversation
+      // C. Send email notification if receiver is offline and not in this conversation
       try {
         const activeKey = `${ACTIVE_CONVERSATION_PREFIX}${receiverId}`;
         const activeConversationId = await pubClient.get(activeKey);
 
         if (activeConversationId !== connectionId) {
-          const sender = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { fullName: true, name: true },
-          });
-
-          const senderName = sender?.fullName || sender?.name || 'User';
-          const messagePreview = content?.trim()
-            ? content.trim().slice(0, 120)
-            : mediaUrl
-              ? 'Sent an attachment'
-              : 'Sent a message';
-
-          const notification = await prisma.notification.create({
-            data: {
-              userId: receiverId,
-              type: 'MESSAGE',
-              title: `${senderName} sent you a message`,
-              message: messagePreview,
-              relatedUserId: userId,
-              relatedEntityId: connectionId,
-              relatedEntityType: 'connection',
-              isSeen: false,
-              isRead: false,
-            },
-          });
-
-          io.to(receiverId).emit('notification:new', { notification });
-
-          // Send email notification if receiver is offline
           const isReceiverOnline = await isUserOnline(receiverId);
           if (!isReceiverOnline) {
+            const sender = await prisma.user.findUnique({
+              where: { id: userId },
+              select: { fullName: true, name: true },
+            });
+            const senderName = sender?.fullName || sender?.name || 'User';
+            const messagePreview = content?.trim()
+              ? content.trim().slice(0, 120)
+              : mediaUrl
+                ? 'Sent an attachment'
+                : 'Sent a message';
+
             const nextjsUrl = process.env.NEXTJS_URL || 'http://localhost:3000';
             fetch(`${nextjsUrl}/api/internal/email/notify`, {
               method: 'POST',

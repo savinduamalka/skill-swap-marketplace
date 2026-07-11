@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(
   request: NextRequest,
@@ -131,6 +132,19 @@ export async function POST(
         });
       });
 
+      // Notify both parties about the cancellation
+      const cancellerName = session.user.name || 'Someone';
+      const otherUserId = isLearner ? sessionRecord.providerId : sessionRecord.learnerId;
+      createNotification({
+        userId: otherUserId,
+        type: 'SESSION_CANCELLED',
+        title: 'Session cancelled',
+        message: `"${sessionRecord.sessionName}" has been cancelled by mutual agreement. Credits have been refunded.`,
+        relatedUserId: userId,
+        relatedEntityId: sessionId,
+        relatedEntityType: 'session',
+      }).catch(console.error);
+
       return NextResponse.json({
         success: true,
         message: 'Session cancelled by mutual agreement. Credits have been refunded to the learner.',
@@ -147,6 +161,18 @@ export async function POST(
       });
 
       const otherUser = isLearner ? sessionRecord.provider : sessionRecord.learner;
+      const requesterName = session.user.name || 'Someone';
+
+      // Notify the other party about the cancellation request
+      createNotification({
+        userId: otherUser.id,
+        type: 'SESSION_CANCELLATION_REQUESTED',
+        title: 'Session cancellation requested',
+        message: `${requesterName} has requested to cancel the session "${sessionRecord.sessionName}". Please review and agree or disagree.`,
+        relatedUserId: userId,
+        relatedEntityId: sessionId,
+        relatedEntityType: 'session',
+      }).catch(console.error);
 
       return NextResponse.json({
         success: true,
