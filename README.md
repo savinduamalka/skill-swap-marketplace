@@ -30,7 +30,6 @@ A full-stack web application where people teach what they know and learn what th
 - [Deployment](#deployment)
 - [Development Guide](#development-guide)
 - [Troubleshooting](#troubleshooting)
-- [License](#license)
 
 ---
 
@@ -270,31 +269,37 @@ Skill-Swap/Code/
 ### Connections (credit-gated)
 - Send a connection request → **5 credits held** in the sender's `outgoingBalance` (atomic Prisma transaction + ledger entry).
 - Accept / decline / cancel requests; an accepted request creates an `ACTIVE` connection.
+- **Disconnect** (close connection) — available from the Active tab and the user's profile page.
 - Block / unblock users (blocked users are filtered out of the newsfeed and discovery).
 - Connection status checks.
+- Notification click navigates to the correct tab (incoming/active/sent).
 
 ### Real-time Messaging
 - One-to-one chat scoped to an active connection.
 - **Cursor-based pagination** (50 messages per page) with infinite scroll — older messages load automatically as the user scrolls up, with scroll position preservation.
 - **In-chat search** that loads the full message pool (`?all=true`) for searching across the entire conversation history.
 - **Media attachments**: images, video, audio, and documents uploaded to Supabase Storage (per-type size limits up to 100 MB for video).
-- Read receipts, message deletion (WhatsApp-style multi-select), and full conversation clearing — all mirrored to the other user in real time.
+- Read receipts, message deletion (multi-select), and full conversation clearing — all mirrored to the other user in real time.
 - **Offers** embedded in chat (create offer, accept/decline/counter-offer) with real-time status updates.
 - Server-side **rate limiting** (5 messages/second/user via Redis).
 - Notification suppression when the recipient is actively viewing the conversation.
 - **Emoji picker** integration for rich message composition.
+- **Conversation sorting** — conversations with newest messages automatically bubble to the top.
+- **Persistent call logs** — call events (ended, missed, declined) saved as messages visible after reload.
 
 ### Presence (enterprise-grade)
 - Online/offline tracking with **30s heartbeat**, **90s offline timeout**, and **1s debounce**.
 - Redis-backed global presence set so status is correct across multiple socket-server nodes.
-- **Presence subscription** (`get_users_status`): clients can request the current online status of specific users on demand (WhatsApp-style), ensuring accurate status display even if the user connected before the status broadcast.
+- **Presence subscription** (`get_users_status`): clients can request the current online status of specific users on demand, ensuring accurate status display even if the user connected before the status broadcast.
 - `user_online_status` history table for analytics (device info, IP).
 - "Last seen X minutes ago" display with periodic refresh.
 
 ### Live Sessions (Video & Audio)
 - LiveKit-powered prebuilt video calls and a custom audio-call interface.
 - Call signaling (`call:initiate` → `call:incoming` / `call:accepted` / `call:rejected` / `call:ended`) relayed via Socket.IO, with offline-recipient detection.
+- **Global call receiving** — incoming calls ring on ANY page (not just the messages page) via an authenticated `CallProvider` context with a full-screen incoming call overlay.
 - **Ringtone** on incoming calls using the Web Audio API (two-tone ring pattern, stops on answer/reject).
+- **Call logs** persisted as messages (saved to database with `mediaType: 'call_event'`) — visible after page reload, styled as centered event indicators.
 - Mobile-optimized call controls with safe-area inset handling for notched devices.
 - LiveKit token minting and webhook event logging (participant joined/left, room finished).
 
@@ -324,13 +329,19 @@ Skill-Swap/Code/
 - Save, list, update progress (per-step completion), and archive roadmaps.
 
 ### Notifications & Email Alerts
-- Persistent in-app notifications (connection/session requests, messages, reviews, post likes/comments) with seen/read states, unread count, and real-time delivery.
+- Persistent in-app notifications for all meaningful platform interactions:
+  - **Connections**: request received, request accepted, request declined (with refund info)
+  - **Sessions**: request received, accepted, declined, cancellation requested, cancelled (mutual), completed
+  - **Reviews**: new review received
+  - **Newsfeed**: post liked, post commented, comment reply, comment liked
+- **No message notifications** — new messages do not generate in-app notifications; the unread badge on the messages icon handles this.
 - **Email notification system** via Resend with branded HTML templates:
   - Connection request received → email with "View Request" CTA
   - New message received (when receiver is offline) → email with message preview
   - Password reset → email with secure token link
 - **Granular notification preferences** (master toggle + per-type: connection requests, session reminders, messages) persisted in the database and auto-saved from the settings UI.
 - Smart email delivery: only sends when the receiver is offline (not connected via WebSocket), preventing spam for active users.
+- **Global incoming call notifications** — calls ring on any page via the `CallProvider` context (authenticated global socket), not just the messages page.
 
 ### UI/UX & Responsive Design
 - **Dark mode** support via `next-themes` with system preference detection.
@@ -509,6 +520,7 @@ All routes below are under the Next.js app. Most require an authenticated NextAu
 | `POST` | `/api/connections/decline` | Decline a request. |
 | `POST` | `/api/connections/cancel` | Cancel a sent request (refund held credits). |
 | `GET` | `/api/connections/status` | Get connection/request status between two users. |
+| `POST` | `/api/connections/disconnect` | Close an active connection (sets status to ENDED). |
 
 ### Messages
 | Method | Endpoint | Description |
@@ -848,16 +860,16 @@ pnpm exec prisma migrate dev        # local development
 6. If using LiveKit webhooks, point your LiveKit project's webhook at `POST /api/livekit/webhook`.
 
 ### Next.js app — Vercel
-The web app is deployed on **Vercel** at **[skill-swap-marketplace-woad.vercel.app](https://skill-swap-marketplace-woad.vercel.app/)**.
+The web app is deployed on **Vercel** at **[skillswap.savinduamalka.app](https://skillswap.savinduamalka.app/)**.
 
 1. Import the repository into Vercel and set the **Root Directory** to `skill-swap/`.
 2. Build command: `pnpm build` (runs `prisma generate && next build`); output is handled by Vercel's Next.js preset.
 3. Add all `skill-swap` environment variables (see the table above) in **Project Settings → Environment Variables**. In particular:
-   - `NEXTAUTH_URL` → `https://skill-swap-marketplace-woad.vercel.app`
+   - `NEXTAUTH_URL` → `https://skillswap.savinduamalka.app`
    - `NEXT_PUBLIC_SOCKET_URL` → your Render socket URL (e.g. `https://<service>.onrender.com`)
    - `SOCKET_SECRET` → identical to the Render service's value
 4. The Prisma client is tuned for serverless pooling (`max: 2`, Supabase transaction pooler) which suits Vercel's function model.
-5. Update Google/Facebook OAuth redirect URIs to the Vercel domain, and point the LiveKit webhook at `https://skill-swap-marketplace-woad.vercel.app/api/livekit/webhook`.
+5. Update Google/Facebook OAuth redirect URIs to the Vercel domain, and point the LiveKit webhook at `https://skillswap.savinduamalka.app/api/livekit/webhook`.
 
 ### Socket server — Render
 The WebSocket microservice is deployed on **Render** as a Web Service.
@@ -865,7 +877,7 @@ The WebSocket microservice is deployed on **Render** as a Web Service.
 1. Create a **Web Service** with **Root Directory** `socket-server/`.
 2. Build command: `pnpm install && pnpm exec prisma generate`.
 3. Start command: `pnpm start` (`tsx server.ts`).
-4. Environment variables: `DATABASE_URL`, `SOCKET_SECRET` (must match Vercel), `NEXTJS_URL=https://skill-swap-marketplace-woad.vercel.app`, `REDIS_URL` (Render Redis / managed Redis), and optionally `PORT` (Render injects its own `PORT`, which the server already honors).
+4. Environment variables: `DATABASE_URL`, `SOCKET_SECRET` (must match Vercel), `NEXTJS_URL=https://skillswap.savinduamalka.app`, `REDIS_URL` (Render Redis / managed Redis), and optionally `PORT` (Render injects its own `PORT`, which the server already honors).
 5. The server handles `SIGTERM` for graceful shutdown (closes the HTTP server, Prisma, and Redis clients) — compatible with Render's deploy/restart lifecycle.
 
 > Keep the two services pointed at each other: Vercel's `NEXT_PUBLIC_SOCKET_URL` = the Render URL, and Render's `NEXTJS_URL` = the Vercel URL (used as the Socket.IO CORS origin). `SOCKET_SECRET` must be identical on both.
@@ -942,13 +954,6 @@ No `CONTRIBUTING.md` exists, so a reasonable workflow is:
 - Use `pnpm exec prisma studio` (in `skill-swap`) to inspect the database directly.
 
 ---
-
----
-
-## License
-
-- `skill-swap/package.json` does **not** declare a license field.
-- `socket-server/package.json` declares **`ISC`**.
 
 ---
 
