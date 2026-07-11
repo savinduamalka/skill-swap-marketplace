@@ -84,6 +84,13 @@ interface Session {
 }
 
 export default function SessionsPage() {
+  const [defaultTab, setDefaultTab] = useState('active')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    if (tab) setDefaultTab(tab)
+  }, [])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
@@ -691,7 +698,7 @@ export default function SessionsPage() {
           </div>
 
           {/* Session Tabs */}
-          <Tabs defaultValue="active" className="space-y-6">
+          <Tabs defaultValue={defaultTab} className="space-y-6">
             <TabsList className="grid grid-cols-4 w-full">
               <TabsTrigger value="active">Active ({activeSessions.length})</TabsTrigger>
               <TabsTrigger value="requests">Requests ({totalRequests})</TabsTrigger>
@@ -815,3 +822,5 @@ export default function SessionsPage() {
     </>
   )
 }
+
+

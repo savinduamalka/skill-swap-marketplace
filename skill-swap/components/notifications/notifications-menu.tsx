@@ -36,9 +36,11 @@ function getNotificationLink(notification: NotificationItem): string {
         ? `/messages?conversation=${notification.relatedEntityId}`
         : '/messages';
     case 'CONNECTION_REQUEST':
+      return '/connections?tab=incoming';
     case 'CONNECTION_ACCEPTED':
-      return '/connections';
+      return '/connections?tab=active';
     case 'SESSION_REQUEST':
+      return '/sessions?tab=requests';
     case 'SESSION_ACCEPTED':
     case 'SESSION_DECLINED':
     case 'SESSION_COMPLETED':
@@ -47,6 +49,11 @@ function getNotificationLink(notification: NotificationItem): string {
       return notification.relatedUserId
         ? `/profile/${notification.relatedUserId}`
         : '/profile';
+    case 'POST_LIKE':
+    case 'POST_COMMENT':
+    case 'COMMENT_REPLY':
+    case 'COMMENT_LIKE':
+      return '/newsfeed';
     default:
       return '/notifications';
   }

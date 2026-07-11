@@ -61,8 +61,13 @@ function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString();
 }
 
-export default async function ConnectionsPage() {
+export default async function ConnectionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const session = await auth();
+  const { tab } = await searchParams;
 
   if (!session?.user?.id) {
     redirect('/login');
@@ -302,7 +307,7 @@ export default async function ConnectionsPage() {
           </div>
 
           {/* Connection Tabs */}
-          <Tabs defaultValue="incoming" className="space-y-6">
+          <Tabs defaultValue={tab || 'incoming'} className="space-y-6">
             <TabsList className="grid grid-cols-4">
               <TabsTrigger value="active">Active ({activeCount})</TabsTrigger>
               <TabsTrigger value="incoming">
