@@ -420,7 +420,17 @@ export function MessagesClient() {
         setConversations((prev) =>
           prev.map((conv) =>
             conv.id === socketMessage.connectionId
-              ? { ...conv, unreadCount: conv.unreadCount + 1 }
+              ? {
+                  ...conv,
+                  unreadCount: conv.unreadCount + 1,
+                  lastMessage: {
+                    content: socketMessage.content,
+                    createdAt: socketMessage.createdAt,
+                    isRead: false,
+                    senderId: socketMessage.senderId,
+                    mediaType: socketMessage.mediaType || null,
+                  },
+                }
               : conv
           )
         );
@@ -1793,6 +1803,12 @@ export function MessagesClient() {
                     : conv.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                       (conv.lastMessage?.content?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
                 )
+                .sort((a, b) => {
+                  // Sort by most recent message (newest first) — like WhatsApp
+                  const timeA = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+                  const timeB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+                  return timeB - timeA;
+                })
                 .map((conv) => (
                 <div key={conv.id} className="relative group">
                   <Card
