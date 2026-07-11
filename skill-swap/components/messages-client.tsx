@@ -1582,19 +1582,17 @@ export function MessagesClient() {
   // Listen for incoming calls
   useEffect(() => {
     const unsubscribe = onCallIncoming((data) => {
-      // Server sends connectionId=roomName; match by caller instead
-      if (selectedConversation?.otherUser.id === data.callerId) {
-        setIncomingCallData(data);
-        setCallState('incoming');
-        toast({
-          title: 'Incoming Call',
-          description: `${selectedConversation?.otherUser.name ?? 'User'} is calling...`,
-        });
-      }
+      // Accept incoming calls regardless of which conversation is selected
+      setIncomingCallData(data);
+      setCallState('incoming');
+      toast({
+        title: 'Incoming Call',
+        description: `${data.callerName ?? 'User'} is calling...`,
+      });
     });
 
     return unsubscribe;
-  }, [onCallIncoming, selectedConversation, toast]);
+  }, [onCallIncoming, toast]);
 
   // Play ringtone when incoming call is received, stop when state changes
   useEffect(() => {

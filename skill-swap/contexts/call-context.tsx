@@ -44,76 +44,74 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const userId = (session.user as any).id;
+    let socket: Socket | null = null;
 
-    // Create socket connection for global call notifications
-    const socket = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      timeout: 20000,
-    });
+    async function connectSocket() {
+      try {
+        // Fetch auth token (same as useChatSocket)
+        const tokenRes = await fetch('/api/auth/socket');
+        if (!tokenRes.ok) return;
+        const { token } = await tokenRes.json();
 
-    socketRef.current = socket;
+        socket = io(SOCKET_URL, {
+          auth: { token },
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionAttempts: 10,
+          reconnectionDelay: 1000,
+          timeout: 20000,
+        });
 
-    socket.on('connect', () => {
-      console.log('📞 Global call socket connected');
-      setIsConnectedToSocket(true);
-      // Register user for receiving calls globally
-      socket.emit('user:register', { userId });
-    });
+        socketRef.current = socket;
 
-    socket.on('disconnect', () => {
-      console.log('📞 Global call socket disconnected');
-      setIsConnectedToSocket(false);
-    });
+        socket.on('connect', () => {
+          setIsConnectedToSocket(true);
+        });
 
-    // Listen for incoming calls globally
-    socket.on('call:incoming', (data: {
-      callerId: string;
-      callerName?: string;
-      callerImage?: string | null;
-      connectionId: string;
-      callType?: 'audio' | 'video';
-      roomName?: string;
-      timestamp?: Date;
-    }) => {
-      console.log('📞 Incoming call received globally:', data);
-      
-      // Set incoming call data
-      setIncomingCall({
-        connectionId: data.connectionId,
-        roomName: data.roomName || data.connectionId,
-        callerId: data.callerId,
-        callerName: data.callerName || 'Unknown',
-        callerImage: data.callerImage,
-        callType: data.callType || 'video',
-        timestamp: data.timestamp,
-      });
+        socket.on('disconnect', () => {
+          setIsConnectedToSocket(false);
+        });
 
-      // Show toast notification
-      toast.info(`${data.callType === 'audio' ? '📞' : '📹'} Incoming ${data.callType || 'video'} call`, {
-        description: `${data.callerName || 'Someone'} is calling you`,
-        duration: 30000, // 30 seconds
-      });
-    });
+        // Listen for incoming calls globally (works on ANY page)
+        socket.on('call:incoming', (data: {
+          callerId: string;
+          callerName?: string;
+          callerImage?: string | null;
+          connectionId: string;
+          callType?: 'audio' | 'video';
+          roomName?: string;
+          timestamp?: Date;
+        }) => {
+          setIncomingCall({
+            connectionId: data.connectionId,
+            roomName: data.roomName || data.connectionId,
+            callerId: data.callerId,
+            callerName: data.callerName || 'Unknown',
+            callerImage: data.callerImage,
+            callType: data.callType || 'video',
+            timestamp: data.timestamp,
+          });
+        });
 
-    // Listen for call rejection (caller cancelled)
-    socket.on('call:rejected', (data) => {
-      console.log('📞 Call rejected/cancelled:', data);
-      setIncomingCall(null);
-    });
+        socket.on('call:rejected', () => {
+          setIncomingCall(null);
+        });
 
-    // Listen for call ended
-    socket.on('call:ended', (data) => {
-      console.log('📞 Call ended:', data);
-      setIncomingCall(null);
-    });
+        socket.on('call:ended', () => {
+          setIncomingCall(null);
+        });
+      } catch (error) {
+        console.error('Global call socket connection failed:', error);
+      }
+    }
+
+    connectSocket();
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      if (socket) {
+        socket.disconnect();
+        socketRef.current = null;
+      }
     };
   }, [session?.user, status]);
 
