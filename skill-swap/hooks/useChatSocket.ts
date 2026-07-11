@@ -306,19 +306,6 @@ export const useChatSocket = () => {
         }
       );
 
-      // Legacy events (for backwards compatibility)
-      socketRef.current.on('user_online', (data: { userId: string }) => {
-        userOnlineCallbacks.current.forEach((cb) =>
-          cb({ userId: data.userId, isOnline: true })
-        );
-      });
-
-      socketRef.current.on('user_offline', (data: { userId: string }) => {
-        userOnlineCallbacks.current.forEach((cb) =>
-          cb({ userId: data.userId, isOnline: false })
-        );
-      });
-
       // Response to get_users_status request
       socketRef.current.on(
         'users_status_response',
@@ -384,17 +371,6 @@ export const useChatSocket = () => {
           timestamp?: Date;
         }) => {
           callAnswerCallbacks.current.forEach((cb) => cb(data));
-        }
-      );
-
-      socketRef.current.on(
-        'call:ice-candidate',
-        (data: {
-          from: string;
-          connectionId: string;
-          candidate: RTCIceCandidateInit;
-        }) => {
-          callIceCandidateCallbacks.current.forEach((cb) => cb(data));
         }
       );
 
@@ -773,12 +749,10 @@ export const useChatSocket = () => {
     requestUsersStatus,
     onCallIncoming,
     onCallAnswer,
-    onCallIceCandidate,
     onCallRejected,
     onCallEnded,
     initiateCall,
     sendCallAnswer,
-    sendIceCandidate,
     rejectCall,
     endCall,
     reconnect,
