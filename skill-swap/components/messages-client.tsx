@@ -183,7 +183,7 @@ export function MessagesClient() {
     notifyOfferStatusChanged,
   } = useChatSocket();
 
-  // Message selection state (WhatsApp-style)
+  // Message selection state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -425,7 +425,7 @@ export function MessagesClient() {
                   unreadCount: conv.unreadCount + 1,
                   lastMessage: {
                     content: socketMessage.content,
-                    createdAt: socketMessage.createdAt,
+                    createdAt: new Date(socketMessage.createdAt).toISOString(),
                     isRead: false,
                     senderId: socketMessage.senderId,
                     mediaType: socketMessage.mediaType || null,
@@ -1014,7 +1014,7 @@ export function MessagesClient() {
     }
   };
 
-  // ==================== MESSAGE SELECTION & DELETION (WhatsApp-style) ====================
+  // ==================== MESSAGE SELECTION & DELETION ====================
   
   // Toggle selection mode
   const enterSelectionMode = (messageId: string) => {
@@ -1804,7 +1804,7 @@ export function MessagesClient() {
                       (conv.lastMessage?.content?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
                 )
                 .sort((a, b) => {
-                  // Sort by most recent message (newest first) — like WhatsApp
+                  // Sort by most recent message (newest first)
                   const timeA = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
                   const timeB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
                   return timeB - timeA;
@@ -1917,7 +1917,7 @@ export function MessagesClient() {
               className="flex-1 flex flex-col md:border-l md:border-border overflow-hidden"
               onClick={handleChatAreaClick}
             >
-              {/* Selection Mode Header (WhatsApp-style) */}
+              {/* Selection Mode Header*/}
               {isSelectionMode ? (
                 <div className="flex items-center justify-between p-4 border-b border-border bg-primary/10">
                   <div className="flex items-center gap-3">
@@ -2230,7 +2230,7 @@ export function MessagesClient() {
                           }
                         }}
                       >
-                        {/* Selection Checkbox (WhatsApp-style) */}
+                        {/* Selection Checkbox */}
                         {isSelectionMode && !msg.messageType && msg.mediaType !== 'call_event' && (
                           <div 
                             className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 ${
@@ -2636,7 +2636,7 @@ export function MessagesClient() {
         </div>
       )}
 
-      {/* Delete Messages Confirmation Dialog (WhatsApp-style) */}
+      {/* Delete Messages Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
