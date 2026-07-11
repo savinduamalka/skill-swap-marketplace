@@ -18,11 +18,9 @@ import {
   BookOpen,
   Ban,
 } from 'lucide-react';
-import { ConnectButton } from '@/components/connect-button';
 import { BackButton } from '@/components/back-button';
-import { BlockUserButton } from '@/components/block-user-button';
-import { DisconnectButton } from '@/components/connections/disconnect-button';
 import { ProfilePostsSection } from './profile-posts-section';
+import { ProfileActions } from './profile-actions';
 
 // Force dynamic rendering to always get fresh connection status
 export const dynamic = 'force-dynamic';
@@ -512,26 +510,15 @@ export default async function UserProfilePage({
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex flex-wrap gap-2">
-                    <ConnectButton
-                      receiverId={profile.id}
-                      receiverName={displayName}
-                      isConnected={isConnected}
-                      hasPendingRequest={hasPendingRequest}
-                      isSentByCurrentUser={isSentByCurrentUser}
-                    />
-                    {isConnected && activeConnectionId && (
-                      <DisconnectButton
-                        connectionId={activeConnectionId}
-                        userName={displayName}
-                      />
-                    )}
-                    <BlockUserButton
-                      userId={profile.id}
-                      userName={displayName}
-                      isBlocked={isBlockedByMe}
-                    />
-                  </div>
+                  <ProfileActions
+                    userId={profile.id}
+                    userName={displayName}
+                    isConnected={isConnected}
+                    connectionId={activeConnectionId}
+                    hasPendingRequest={hasPendingRequest}
+                    isSentByCurrentUser={isSentByCurrentUser}
+                    isBlocked={isBlockedByMe}
+                  />
                 </div>
 
                 {/* Bio */}
