@@ -60,15 +60,17 @@ export function ProfileActions({
 
   return (
     <div className="flex items-center gap-2">
-      <ConnectButton
-        receiverId={userId}
-        receiverName={userName}
-        isConnected={isConnected}
-        hasPendingRequest={hasPendingRequest}
-        isSentByCurrentUser={isSentByCurrentUser}
-      />
+      {!isBlocked && (
+        <ConnectButton
+          receiverId={userId}
+          receiverName={userName}
+          isConnected={isConnected}
+          hasPendingRequest={hasPendingRequest}
+          isSentByCurrentUser={isSentByCurrentUser}
+        />
+      )}
 
-      {isConnected && connectionId && (
+      {!isBlocked && isConnected && connectionId && (
         <DisconnectButton connectionId={connectionId} userName={userName} />
       )}
 
