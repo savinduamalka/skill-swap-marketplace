@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { ConnectionRequestActions } from '@/components/connection-request-actions';
 import { CancelRequestButton } from '@/components/connections/cancel-request-button';
 import { UnblockButton } from '@/components/unblock-button';
+import { DisconnectButton } from '@/components/connections/disconnect-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -390,6 +391,10 @@ export default async function ConnectionsPage({
                             Profile
                           </Link>
                         </Button>
+                        <DisconnectButton
+                          connectionId={connection.id}
+                          userName={getDisplayName(connection.otherUser)}
+                        />
                       </div>
                     </div>
                   </Card>

@@ -21,6 +21,7 @@ import {
 import { ConnectButton } from '@/components/connect-button';
 import { BackButton } from '@/components/back-button';
 import { BlockUserButton } from '@/components/block-user-button';
+import { DisconnectButton } from '@/components/connections/disconnect-button';
 import { ProfilePostsSection } from './profile-posts-section';
 
 // Force dynamic rendering to always get fresh connection status
@@ -229,6 +230,7 @@ async function checkConnectionStatus(
   profileUserId: string
 ): Promise<{
   isConnected: boolean;
+  connectionId: string | null;
   hasPendingRequest: boolean;
   isSentByCurrentUser: boolean;
 }> {
@@ -266,6 +268,7 @@ async function checkConnectionStatus(
 
     return {
       isConnected: !!connection,
+      connectionId: connection?.id || null,
       hasPendingRequest: !!pendingRequest,
       isSentByCurrentUser: pendingRequest?.senderId === currentUserId,
     };
@@ -273,6 +276,7 @@ async function checkConnectionStatus(
     console.error('Error checking connection status:', error);
     return {
       isConnected: false,
+      connectionId: null,
       hasPendingRequest: false,
       isSentByCurrentUser: false,
     };
@@ -402,7 +406,7 @@ export default async function UserProfilePage({
       getActiveConnectionCount(userId, session.user.id),
     ]);
 
-  const { isConnected, hasPendingRequest, isSentByCurrentUser } =
+  const { isConnected, connectionId: activeConnectionId, hasPendingRequest, isSentByCurrentUser } =
     connectionStatus;
   const { isBlockedByMe, hasBlockedMe } = blockStatus;
 
@@ -508,7 +512,7 @@ export default async function UserProfilePage({
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <ConnectButton
                       receiverId={profile.id}
                       receiverName={displayName}
@@ -516,6 +520,12 @@ export default async function UserProfilePage({
                       hasPendingRequest={hasPendingRequest}
                       isSentByCurrentUser={isSentByCurrentUser}
                     />
+                    {isConnected && activeConnectionId && (
+                      <DisconnectButton
+                        connectionId={activeConnectionId}
+                        userName={displayName}
+                      />
+                    )}
                     <BlockUserButton
                       userId={profile.id}
                       userName={displayName}
