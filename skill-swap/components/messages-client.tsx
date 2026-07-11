@@ -61,6 +61,7 @@ import {
   CheckCircle2,
   Circle,
   Handshake,
+  Sparkles,
 } from 'lucide-react';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useToast } from '@/hooks/use-toast';
@@ -78,6 +79,7 @@ import type {
 } from '@/lib/types/messages';
 import { CreateOfferDialog } from '@/components/create-offer-dialog';
 import { OfferMessageCard } from '@/components/offer-message-card';
+import { SkillSwapAIChat } from '@/components/skillswap-ai-chat';
 import { useWallet } from '@/contexts/wallet-context';
 
 export function MessagesClient() {
@@ -95,6 +97,10 @@ export function MessagesClient() {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [isAIPinned, setIsAIPinned] = useState(true);
+  const [aiMessages, setAiMessages] = useState<any[]>([]);
+  const [aiLastMessageAt, setAiLastMessageAt] = useState<string | null>(null);
   const [counterOfferData, setCounterOfferData] = useState<any | null>(null);
   const [originalOfferMessageId, setOriginalOfferMessageId] = useState<string | null>(null);
   const { wallet, refreshWallet } = useWallet();
@@ -198,6 +204,15 @@ export function MessagesClient() {
   // Fetch conversations on mount
   useEffect(() => {
     fetchConversations();
+    // Load AI chat state
+    fetch('/api/ai/chat').then(async (res) => {
+      if (res.ok) {
+        const data = await res.json();
+        setAiMessages(data.messages || []);
+        setIsAIPinned(data.isPinned ?? true);
+        setAiLastMessageAt(data.lastMessageAt || null);
+      }
+    }).catch(() => {});
   }, []);
 
   // Request online status of all conversation users when connected
@@ -779,6 +794,8 @@ export function MessagesClient() {
   };
 
   const handleSelectConversation = async (connectionId: string) => {
+    // Close AI chat when opening a real conversation
+    setShowAIChat(false);
     // Inform context that this conversation is now open
     setCurrentOpenConversation(connectionId);
 
@@ -1718,37 +1735,16 @@ export function MessagesClient() {
     );
   }
 
-  if (conversations.length === 0) {
-    return (
-      <>
-        <Header />
-        <main className="pb-0">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 h-[calc(100dvh-128px)] md:h-[calc(100vh-200px)]">
-            <Card className="p-8 h-full flex items-center justify-center">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold mb-2">
-                  No Conversations Yet
-                </h2>
-                <p className="text-muted-foreground">
-                  Connect with other users to start messaging!
-                </p>
-              </div>
-            </Card>
-          </div>
-        </main>
-        <MobileNav />
-      </>
-    );
-  }
+  // Removed empty state early return — AI chat is always available even with no conversations
 
   return (
     <>
       <Header />
 
-      <main className={`pb-0 !pb-0 overflow-hidden ${selectedConversation ? 'no-bottom-padding' : ''}`}>
-        <div className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 ${selectedConversation ? 'h-[calc(100dvh-64px)]' : 'h-[calc(100dvh-128px)]'} md:h-[calc(100vh-200px)] flex flex-col md:flex-row gap-6 overflow-hidden`}>
+      <main className={`pb-0 !pb-0 overflow-hidden ${(selectedConversation || showAIChat) ? 'no-bottom-padding' : ''}`}>
+        <div className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 ${(selectedConversation || showAIChat) ? 'h-[calc(100dvh-64px)]' : 'h-[calc(100dvh-128px)]'} md:h-[calc(100vh-200px)] flex flex-col md:flex-row gap-6 overflow-hidden`}>
           {/* Conversation List Sidebar */}
-          <div className={`${selectedConversation ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 md:border-r border-border overflow-hidden`}>
+          <div className={`${(selectedConversation || showAIChat) ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 md:border-r border-border overflow-hidden`}>
             {/* Connection Status */}
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Messages</h2>
@@ -1794,6 +1790,39 @@ export function MessagesClient() {
 
             {/* Conversation Items */}
             <div className="flex-1 overflow-y-auto space-y-2">
+              {/* SkillSwap AI — Pinned at top OR sorted with conversations */}
+              {isAIPinned && (
+                <div
+                  onClick={() => { setShowAIChat(true); setSelectedConversation(null); }}
+                  className={`p-3 rounded-lg cursor-pointer transition border ${
+                    showAIChat
+                      ? 'bg-primary/10 border-primary/30'
+                      : 'bg-gradient-to-r from-primary/5 to-secondary/5 border-border/50 hover:border-primary/20 hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Avatar className="w-11 h-11 ring-2 ring-primary/20">
+                        <AvatarImage src="/skillswap-logo.png" alt="SkillSwap AI" />
+                        <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-sm text-foreground">SkillSwap AI</p>
+                        <Sparkles className="w-3.5 h-3.5 text-primary" />
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {aiMessages.length > 0
+                          ? aiMessages[aiMessages.length - 1].content.slice(0, 40)
+                          : 'Ask me anything about SkillSwap'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {conversations
                 .filter((conv) =>
                   searchQuery.trim() === ''
@@ -1906,8 +1935,57 @@ export function MessagesClient() {
                   </Card>
                 </div>
               ))}
+
+              {/* SkillSwap AI — shown in list when unpinned */}
+              {!isAIPinned && (
+                <div
+                  onClick={() => { setShowAIChat(true); setSelectedConversation(null); }}
+                  className={`p-3 rounded-lg cursor-pointer transition border ${
+                    showAIChat
+                      ? 'bg-primary/10 border-primary/30'
+                      : 'border-border/50 hover:border-primary/20 hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Avatar className="w-11 h-11">
+                        <AvatarImage src="/skillswap-logo.png" alt="SkillSwap AI" />
+                        <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-foreground">SkillSwap AI</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {aiMessages.length > 0
+                          ? aiMessages[aiMessages.length - 1].content.slice(0, 40)
+                          : 'Ask me anything'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* AI Chat Window */}
+          {showAIChat && !selectedConversation && (
+            <SkillSwapAIChat
+              onClose={() => setShowAIChat(false)}
+              isPinned={isAIPinned}
+              onTogglePin={async () => {
+                const newState = !isAIPinned;
+                setIsAIPinned(newState);
+                await fetch('/api/ai/chat', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ pinned: newState }),
+                }).catch(() => {});
+              }}
+              onClearChat={() => { setAiMessages([]); setAiLastMessageAt(null); }}
+              initialMessages={aiMessages}
+            />
+          )}
 
           {/* Chat Window */}
           {selectedConversation && (
@@ -2765,7 +2843,7 @@ export function MessagesClient() {
       )}
 
       {/* Hide mobile nav when a conversation is open on mobile (full-screen chat) */}
-      {!selectedConversation && <MobileNav />}
+      {!selectedConversation && !showAIChat && <MobileNav />}
     </>
   );
 }
