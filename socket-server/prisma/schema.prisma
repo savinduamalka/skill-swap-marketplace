@@ -91,12 +91,12 @@ model User {
   updatedAt             DateTime  @updatedAt
 
   // Email Notification Preferences
-  notifyEmail           Boolean   @default(true)
-  notifyConnectionReq   Boolean   @default(true)
-  notifySessionReminder Boolean   @default(true)
-  notifyMessages        Boolean   @default(true)
+  notifyEmail           Boolean   @default(true)            // Master toggle for all email notifications
+  notifyConnectionReq   Boolean   @default(true)            // Connection request received
+  notifySessionReminder Boolean   @default(true)            // Upcoming session reminders
+  notifyMessages        Boolean   @default(true)            // New message received
 
-  // Online Status Tracking (like WhatsApp, Facebook)
+  // Online Status Tracking
   isOnline              Boolean   @default(false)           // Current online status
   lastSeenAt            DateTime  @default(now())          // Last activity timestamp
   connectionCount       Int       @default(0)              // Number of active connections
@@ -126,34 +126,20 @@ model User {
   postLikes             PostLike[]
   postComments          PostComment[]             @relation("Commenter")
   commentLikes          CommentLike[]
+  aiChatMessages        AiChatMessage[]
+  aiChatPinned          Boolean   @default(true)
   savedPosts            SavedPost[]
   notifications         Notification[]
   searchHistory         SearchHistory[]
   blockedUsers          BlockedUser[]             @relation("Blocker")
   blockedBy             BlockedUser[]             @relation("Blocked")
   onlineStatusHistory   UserOnlineStatus[]
+  learningRoadmaps      LearningRoadmap[]
 
   @@index([email])
   @@index([isOnline])
   @@index([lastSeenAt])
   @@map("users")
-}
-
-// ==================== USER ONLINE STATUS HISTORY ====================
-// Tracks online/offline status changes for analytics and presence verification
-model UserOnlineStatus {
-  id                    String    @id @default(cuid())
-  userId                String
-  isOnline              Boolean
-  timestamp             DateTime  @default(now())
-  deviceInfo            String?   // Browser/device info
-  ipAddress             String?   // User's IP (for security)
-
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([timestamp])
-  @@map("user_online_status")
 }
 
 // ==================== BLOCKED USER MODEL ====================
@@ -173,6 +159,23 @@ model BlockedUser {
   @@index([blockerId])
   @@index([blockedId])
   @@map("blocked_users")
+}
+
+// ==================== USER ONLINE STATUS HISTORY ====================
+// Tracks online/offline status changes for analytics and presence verification
+model UserOnlineStatus {
+  id                    String    @id @default(cuid())
+  userId                String
+  isOnline              Boolean
+  timestamp             DateTime  @default(now())
+  deviceInfo            String?   // Browser/device info
+  ipAddress             String?   // User's IP (for security)
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([timestamp])
+  @@map("user_online_status")
 }
 
 // ==================== SKILL MODELS ====================
@@ -218,6 +221,33 @@ model SkillWant {
   @@index([userId])
   @@index([name])
   @@map("skill_wants")
+}
+
+// ==================== LEARNING ROADMAP MODEL ====================
+model LearningRoadmap {
+  id                    String    @id @default(cuid())
+  userId                String
+  skillWantId           String?   // Optional link to the originating learning goal
+  skillName             String
+  skillDescription      String?   @db.Text
+  proficiencyTarget     String?   // "Beginner" | "Intermediate" | "Advanced" | "Expert"
+
+  title                 String              
+  summary               String?   @db.Text  
+  estimatedDuration     String?             
+  content               Json                
+  completedSteps        String[]  @default([]) // Step ids the user has completed
+  isArchived            Boolean   @default(false)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([skillName])
+  @@map("learning_roadmaps")
 }
 
 // ==================== CONNECTION MODELS ====================
@@ -304,7 +334,10 @@ model SessionRequest {
   receiverId            String
   skillId               String?
   sessionName           String
+  description           String?   @db.Text
+  mode                  String    @default("ONLINE") // "ONLINE" | "PHYSICAL"
   status                String    @default("PENDING") // "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED"
+  isSeen                Boolean   @default(false)
   creditsHeld           Int       @default(5) // Credits for session request
   sessionCredits        Int       @default(20) // Credits for full session
   startDate             DateTime
@@ -321,6 +354,7 @@ model SessionRequest {
   @@index([senderId])
   @@index([receiverId])
   @@index([status])
+  @@index([isSeen])
   @@map("session_requests")
 }
 
@@ -331,7 +365,15 @@ model Session {
   skillId               String
   connectionId          String
   sessionName           String
+  description           String?   @db.Text
+  mode                  String    @default("ONLINE") // "ONLINE" | "PHYSICAL"
   status                String    @default("ACTIVE") // "ACTIVE" | "COMPLETED" | "CANCELLED"
+  learnerCompletionConfirmed  Boolean @default(false)
+  providerCompletionConfirmed Boolean @default(false)
+  learnerCancellationRequested  Boolean @default(false)
+  providerCancellationRequested Boolean @default(false)
+  cancelledBy           String?   // User ID who initiated final cancellation
+  cancelReason          String?   @db.Text
   startDate             DateTime
   endDate               DateTime
   requestCredits        Int       @default(5) // Credits from session request
@@ -390,6 +432,8 @@ model Review {
   reliability           Int?      // 1-5
   punctuality           Int?      // 1-5
   comments              String?   @db.Text
+  reply                 String?   @db.Text
+  repliedAt             DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -502,7 +546,7 @@ model PostComment {
   postId                String
   commenterId           String
   content               String
-  parentId              String?
+  parentId              String?   // If replying to another comment
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -549,6 +593,22 @@ model SavedPost {
   @@index([postId])
   @@index([userId])
   @@map("saved_posts")
+}
+
+// ==================== AI CHAT ====================
+
+model AiChatMessage {
+  id                    String    @id @default(cuid())
+  userId                String
+  role                  String    // 'user' or 'assistant'
+  content               String
+  createdAt             DateTime  @default(now())
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("ai_chat_messages")
 }
 
 // ==================== NOTIFICATION MODELS ====================

@@ -126,6 +126,8 @@ model User {
   postLikes             PostLike[]
   postComments          PostComment[]             @relation("Commenter")
   commentLikes          CommentLike[]
+  aiChatMessages        AiChatMessage[]
+  aiChatPinned          Boolean   @default(true)
   savedPosts            SavedPost[]
   notifications         Notification[]
   searchHistory         SearchHistory[]
@@ -591,6 +593,22 @@ model SavedPost {
   @@index([postId])
   @@index([userId])
   @@map("saved_posts")
+}
+
+// ==================== AI CHAT ====================
+
+model AiChatMessage {
+  id                    String    @id @default(cuid())
+  userId                String
+  role                  String    // 'user' or 'assistant'
+  content               String
+  createdAt             DateTime  @default(now())
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("ai_chat_messages")
 }
 
 // ==================== NOTIFICATION MODELS ====================
