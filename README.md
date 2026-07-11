@@ -30,7 +30,6 @@ A full-stack web application where people teach what they know and learn what th
 - [Deployment](#deployment)
 - [Development Guide](#development-guide)
 - [Troubleshooting](#troubleshooting)
-- [Architectural Concerns & Missing Documentation](#architectural-concerns--missing-documentation)
 - [License](#license)
 
 ---
@@ -193,7 +192,8 @@ Skill-Swap/Code/
 - **Client ⇄ Next.js**: HTTPS for pages and `fetch` for JSON REST APIs. Session via NextAuth JWT cookie.
 - **Client ⇄ Socket Server**: Persistent WebSocket (with polling fallback) authenticated by short-lived JWT.
 - **Client ⇄ LiveKit**: Direct WebRTC media using a token minted by `POST /api/livekit/token`. Call *signaling* (ring/answer/reject/end) is relayed through the socket server; actual audio/video flows through LiveKit's SFU.
-- **Next.js ⇄ Socket Server**: One-way internal HTTP (`/internal/notifications`) secured by `SOCKET_SECRET`.
+- **Next.js ⇄ Socket Server**: One-way internal HTTP (`/internal/notifications`, `/internal/newsfeed`) secured by `SOCKET_SECRET`.
+- **Newsfeed Pub/Sub**: API routes publish interaction events → socket server broadcasts via `io.emit()` → all connected clients receive updates in real-time (likes, comments, replies sync across all viewers without page reload).
 - **Both services ⇄ PostgreSQL**: Prisma Client over a `pg` connection pool.
 - **Socket Server ⇄ Redis**: Socket.IO Redis adapter (cross-node broadcast) + presence sets, active-conversation keys, and per-user message rate limiting.
 
@@ -240,12 +240,13 @@ Skill-Swap/Code/
 > Note: `socket-server/node_modules` also contains `mysql2` and `postgres` (transitive/optional Prisma driver dependencies). The application is configured for **PostgreSQL** only.
 
 ### Infrastructure / DevOps
-- **pnpm** (lockfiles present in both packages; `socket-server` also has a `package-lock.json`)
+- **pnpm** (lockfiles present in both packages)
 - **nodemon** + **tsx** / **ts-node** for the socket server dev/runtime
 - **ESLint** (`next/core-web-vitals`, `next/typescript`, import ordering rules)
+- **Vitest** unit test suite (89 tests across 7 files — auth, connections, messages, sessions, notifications, upload security)
 - **Hosting**: the **Next.js app is deployed on Vercel** ([skillswap.savinduamalka.app](https://skillswap.savinduamalka.app)); the **WebSocket microservice is deployed on Render** (the commented production socket URL in `.env.example` points to `*.onrender.com`).
-- Docker: **Not detected from codebase**
-- CI/CD pipelines: **Not detected from codebase** (Vercel and Render provide their own Git-based auto-deploy)
+- **CI/CD**: Vercel auto-deploys on push to `main`; Render auto-deploys on push. No Docker required — both platforms provide native build environments.
+- **Schema sync**: `./sync-schema.sh` copies the Prisma schema from `skill-swap/` to `socket-server/` and regenerates the client.
 
 ---
 
@@ -306,9 +307,16 @@ Skill-Swap/Code/
 - Wallet with `availableBalance`, `outgoingBalance`, `incomingBalance`.
 - Full **transaction history** with typed entries (connection/session sent/received/refunded, session completed/cancelled, initial allocation).
 
-### Newsfeed (community)
+### Newsfeed (real-time community feed)
 - Create posts (with optional media + hashtags), cursor-paginated feed.
 - Like, comment, save/unsave posts; saved-posts view; per-user post listings.
+- **Threaded comments** with nested replies
+- **Comment reactions** (like/unlike comments) with per-user state tracking.
+- **Real-time Pub/Sub architecture** — all newsfeed interactions (likes, comments, replies, new posts) broadcast live to all connected users via Socket.IO:
+  - API routes publish events → socket server broadcasts → all clients update instantly.
+  - Uses `io.emit()` for global fan-out; Redis adapter ensures delivery across multiple socket nodes.
+  - Optimistic UI updates for the acting user (instant feedback) + server-confirmed live updates for all other users.
+- In-app notifications for post likes, new comments, and comment replies (with "don't notify self" logic).
 - View counts; blocked-user filtering.
 
 ### AI Learning Roadmap
@@ -533,7 +541,8 @@ All routes below are under the Next.js app. Most require an authenticated NextAu
 | `GET/POST` | `/api/newsfeed` | List (cursor-paginated) / create posts. |
 | `GET` | `/api/newsfeed/saved` | List saved posts. |
 | `POST` | `/api/newsfeed/[postId]/like` | Like/unlike a post. |
-| `GET/POST` | `/api/newsfeed/[postId]/comments` | List / add comments. |
+| `GET/POST` | `/api/newsfeed/[postId]/comments` | List (threaded with replies) / add comments. Supports `parentId` for replies. |
+| `POST` | `/api/newsfeed/[postId]/comments/[commentId]/like` | Toggle like on a comment (notifies comment author). |
 | `POST` | `/api/newsfeed/[postId]/save` | Save/unsave a post. |
 | `PATCH/PUT` | `/api/newsfeed/[postId]/edit` | Edit a post. |
 
@@ -587,6 +596,7 @@ All routes below are under the Next.js app. Most require an authenticated NextAu
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `POST` | `/internal/notifications` | `x-socket-secret` header | Emit `notification:new` to a user's room (called by the Next.js app). |
+| `POST` | `/internal/newsfeed` | `x-socket-secret` header | Broadcast newsfeed events (`post_liked`, `post_commented`, `comment_liked`, `comment_replied`, `post_created`) to all connected clients via Pub/Sub. |
 
 ### Request / Response Examples
 
@@ -933,30 +943,12 @@ No `CONTRIBUTING.md` exists, so a reasonable workflow is:
 
 ---
 
-## Architectural Concerns & Missing Documentation
-
-Discovered during analysis — worth addressing:
-
-1. **Broken migrations path in the socket server.** `socket-server/prisma.config.ts` points migrations to `'../Skill Swap/prisma/migrations'`, but the actual app folder is `skill-swap` (lowercase, hyphenated). Running migrations from the socket server would fail or drift. Migrations should be owned solely by the Next.js app, or this path corrected.
-2. **Duplicated Prisma schema.** The schema is copied into both `skill-swap/prisma` and `socket-server/prisma`. There's no automation keeping them in sync, so they can silently diverge. Consider a shared package or a copy step in CI.
-3. **No `.env.example` for the socket server.** Required env vars (`DATABASE_URL`, `SOCKET_SECRET`, `PORT`, `NEXTJS_URL`, `REDIS_URL`) are only discoverable by reading `server.ts`. Add a `socket-server/.env.example`.
-4. **Duplicated Prisma schema.** The schema is maintained in both `skill-swap/prisma` and `socket-server/prisma`. Both must be kept in sync manually. Consider a shared package or a copy step in CI.
-5. **`LLM_MODEL` has no default.** `.env.example` calls it optional and mentions a default model, but `lib/llm.ts` sends `process.env.LLM_MODEL?.trim()` with no fallback. Either hardcode a sensible default or mark it required.
-6. **Empty/placeholder directories.** `app/api/skillfeed/**` contains nested folders with **no `route.ts`** files (appears to be a renamed/legacy alias of `newsfeed`), and `app/api/internal/email/` is empty. These should be removed or implemented to avoid confusion.
-7. **Unwired admin/moderation models.** `AdminLog` and `ReportedContent` exist in the schema but have no corresponding API routes or UI. Reporting/moderation is effectively not implemented yet.
-8. **No automated tests.** Neither package has a real test suite (`socket-server`'s `test` script just errors). The app's `package.json` has no `test` script at all. Consider adding unit/integration tests, especially around the credit-transaction logic.
-9. **No Docker or CI/CD.** There's no containerization or pipeline configuration, so builds, migrations, and deploys are manual.
-10. **Client/server event drift.** The client hook references `call:ice-candidate` and legacy `user_online`/`user_offline` events the current server doesn't emit. Harmless, but dead code worth pruning.
-11. **`nodemailer` installed but unused.** Transactional emails are now handled entirely by the **Resend** SDK; `nodemailer` is a leftover dependency that can be removed.
-
 ---
 
 ## License
 
 - `skill-swap/package.json` does **not** declare a license field.
 - `socket-server/package.json` declares **`ISC`**.
-
-A repository-level license file was **not detected**. Clarify and add a top-level `LICENSE` to make the project's licensing unambiguous.
 
 ---
 
