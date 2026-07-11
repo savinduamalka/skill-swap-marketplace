@@ -333,7 +333,7 @@ export function MessagesClient() {
   const searchResults = chatSearchQuery.trim()
     ? messages.filter(
         (msg) =>
-          !msg.messageType && // Exclude call events
+          !msg.messageType && msg.mediaType !== 'call_event' &&
           msg.content.toLowerCase().includes(chatSearchQuery.toLowerCase())
       )
     : [];
@@ -1334,8 +1334,11 @@ export function MessagesClient() {
         break;
     }
 
+    const tempId = `call-${Date.now()}`;
+
+    // Optimistic UI — show immediately
     const callMessage: Message = {
-      id: `call-${Date.now()}`,
+      id: tempId,
       content,
       senderId: isOutgoing ? session.user.id : selectedConversation.otherUser.id,
       senderName: isOutgoing ? 'You' : selectedConversation.otherUser.name,
@@ -1350,7 +1353,17 @@ export function MessagesClient() {
 
     setMessages((prev) => [...prev, callMessage]);
     scrollToBottom();
-  }, [selectedConversation, session?.user?.id]);
+
+    // Persist to database via socket (save as a message with mediaType 'call_event')
+    if (isOutgoing) {
+      sendMessage({
+        connectionId: selectedConversation.id,
+        content,
+        tempId,
+        mediaType: 'call_event',
+      });
+    }
+  }, [selectedConversation, session?.user?.id, sendMessage]);
 
   const getInitials = (name: string) => {
     return name
@@ -2152,7 +2165,7 @@ export function MessagesClient() {
                 ) : (
                   messages.map((msg) => {
                     const isSearchMatch = chatSearchQuery.trim() && 
-                      !msg.messageType && 
+                      !msg.messageType && msg.mediaType !== 'call_event' &&
                       msg.content.toLowerCase().includes(chatSearchQuery.toLowerCase());
                     const isCurrentSearchResult = searchResults[currentSearchIndex]?.id === msg.id;
                     
@@ -2176,17 +2189,17 @@ export function MessagesClient() {
                       <div
                         key={msg.id}
                         ref={(el) => {
-                          if (el && !msg.messageType) {
+                          if (el && !msg.messageType && msg.mediaType !== 'call_event') {
                             messageRefs.current.set(msg.id, el);
                           }
                         }}
                         className={`flex items-center gap-2 transition-all duration-300 ${
-                          msg.messageType ? 'justify-center' : msg.isOwn ? 'justify-end' : 'justify-start'
+                          (msg.messageType || msg.mediaType === 'call_event') ? 'justify-center' : msg.isOwn ? 'justify-end' : 'justify-start'
                         } ${isCurrentSearchResult ? 'scale-[1.02]' : ''} ${
                           isSelectionMode && selectedMessageIds.has(msg.id) ? 'bg-primary/10 rounded-lg' : ''
                         }`}
                         onContextMenu={(e) => {
-                          if (!msg.messageType) {
+                          if (!msg.messageType && msg.mediaType !== 'call_event') {
                             e.preventDefault();
                             if (!isSelectionMode) {
                               enterSelectionMode(msg.id);
@@ -2196,13 +2209,13 @@ export function MessagesClient() {
                           }
                         }}
                         onClick={() => {
-                          if (isSelectionMode && !msg.messageType) {
+                          if (isSelectionMode && !msg.messageType && msg.mediaType !== 'call_event') {
                             toggleMessageSelection(msg.id);
                           }
                         }}
                       >
                         {/* Selection Checkbox (WhatsApp-style) */}
-                        {isSelectionMode && !msg.messageType && (
+                        {isSelectionMode && !msg.messageType && msg.mediaType !== 'call_event' && (
                           <div 
                             className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 ${
                               selectedMessageIds.has(msg.id) 
@@ -2221,7 +2234,7 @@ export function MessagesClient() {
                         )}
                         
                         {/* Call event messages - centered with special styling */}
-                        {msg.messageType ? (
+                        {(msg.messageType || msg.mediaType === 'call_event') ? (
                           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 text-muted-foreground text-sm">
                             <span>{msg.content}</span>
                             <span className="text-xs opacity-75">
