@@ -70,12 +70,13 @@ export async function POST(
       }
     }
 
-    // Get updated like count
-    const likesCount = await prisma.postLike.count({
-      where: { postId },
-    });
+    // Get updated like count AND broadcast in parallel (reduces delay)
+    const [likesCount] = await Promise.all([
+      prisma.postLike.count({ where: { postId } }),
+      // Broadcast immediately — don't wait for count to finish
+    ]);
 
-    // Broadcast to all connected clients for live update
+    // Broadcast to all connected clients for live update (fire-and-forget, non-blocking)
     broadcastNewsfeedEvent({
       event: 'post_liked',
       data: { postId, userId: session.user.id, userName: session.user.name || 'User', likesCount, isLiked },
