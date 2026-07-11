@@ -343,7 +343,7 @@ export default function ProfilePage() {
             </Card>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
             {/* Skills Offered and Learning - Left Column */}
             <div className="md:col-span-2">
               {/* Skills I Offer */}
