@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -8,6 +8,7 @@ import { ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useChatSocket } from '@/hooks/useChatSocket';
 
 interface Comment {
   id: string;
@@ -46,6 +47,66 @@ export function PostComments({
   const [replyText, setReplyText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const replyInputRef = useRef<HTMLInputElement>(null);
+
+  // Real-time updates for comments via Socket.IO
+  const { onNewsfeedEvent } = useChatSocket();
+
+  useEffect(() => {
+    const unsubscribe = onNewsfeedEvent((event, data) => {
+      if (data.postId !== postId) return;
+
+      switch (event) {
+        case 'post_commented':
+          // Another user added a comment — add it to the list if expanded
+          if (data.comment && !comments.find((c) => c.id === data.comment.id)) {
+            setComments((prev) => [data.comment, ...prev]);
+            setCommentCount(data.commentsCount);
+          }
+          break;
+
+        case 'comment_replied':
+          // Another user replied to a comment
+          if (data.reply && data.parentId) {
+            setComments((prev) =>
+              prev.map((c) =>
+                c.id === data.parentId
+                  ? {
+                      ...c,
+                      replies: [...(c.replies || []).filter((r) => r.id !== data.reply.id), data.reply],
+                      repliesCount: (c.repliesCount || 0) + 1,
+                    }
+                  : c
+              )
+            );
+          }
+          break;
+
+        case 'comment_liked':
+          // Another user liked a comment — update the count
+          if (data.commentId) {
+            setComments((prev) =>
+              prev.map((c) => {
+                if (c.id === data.commentId) {
+                  return { ...c, likesCount: data.likesCount };
+                }
+                if (c.replies) {
+                  return {
+                    ...c,
+                    replies: c.replies.map((r) =>
+                      r.id === data.commentId ? { ...r, likesCount: data.likesCount } : r
+                    ),
+                  };
+                }
+                return c;
+              })
+            );
+          }
+          break;
+      }
+    });
+
+    return unsubscribe;
+  }, [onNewsfeedEvent, postId, comments]);
 
   const fetchComments = async () => {
     setIsLoadingComments(true);

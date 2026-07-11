@@ -34,6 +34,7 @@ import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { BookOpen, Star, Sparkles } from 'lucide-react';
 import { useWallet } from '@/contexts/wallet-context';
+import { useChatSocket } from '@/hooks/useChatSocket';
 import type { NewsfeedPost, NewsfeedSkill } from './page';
 
 interface NewsfeedContentProps {
@@ -77,6 +78,45 @@ export function NewsfeedContent({
 
   // Edit post state
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
+
+  // Real-time newsfeed updates via Socket.IO
+  const { onNewsfeedEvent, isConnected } = useChatSocket();
+
+  useEffect(() => {
+    const unsubscribe = onNewsfeedEvent((event, data) => {
+      switch (event) {
+        case 'post_liked':
+          // Another user liked/unliked a post — update the count
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.id === data.postId
+                ? { ...post, likesCount: data.likesCount }
+                : post
+            )
+          );
+          break;
+
+        case 'post_commented':
+          // Another user commented — update comment count
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.id === data.postId
+                ? { ...post, commentsCount: data.commentsCount }
+                : post
+            )
+          );
+          break;
+
+        case 'post_created':
+          // A new post was created — show alert to refresh
+          setNewPostsCount((prev) => prev + 1);
+          setShowNewPostsAlert(true);
+          break;
+      }
+    });
+
+    return unsubscribe;
+  }, [onNewsfeedEvent]);
   const [editingPost, setEditingPost] = useState<NewsfeedPost | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
 
