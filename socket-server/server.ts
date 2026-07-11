@@ -230,6 +230,23 @@ app.post('/internal/notifications', async (req, res) => {
   return res.json({ success: true });
 });
 
+// Internal API: Broadcast newsfeed events to all connected clients (real-time feed updates)
+app.post('/internal/newsfeed', async (req, res) => {
+  const secret = req.headers['x-socket-secret'];
+  if (!secret || secret !== process.env.SOCKET_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { event, data } = req.body || {};
+  if (!event || !data) {
+    return res.status(400).json({ error: 'Missing event or data' });
+  }
+
+  // Broadcast to all connected clients
+  io.emit(`newsfeed:${event}`, data);
+  return res.json({ success: true });
+});
+
 // Middleware: Authenticate the Socket Connection
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
