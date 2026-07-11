@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
+import { broadcastNewsfeedEvent } from '@/lib/newsfeed-events';
 
 export async function GET(
   request: NextRequest,
@@ -187,23 +188,36 @@ export async function POST(
       }).catch(console.error);
     }
 
-    return NextResponse.json(
-      {
-        id: comment.id,
-        content: comment.content,
-        createdAt: comment.createdAt,
-        parentId: comment.parentId,
-        commenter: {
-          id: comment.commenter.id,
-          name: commenterName,
-          image: comment.commenter.image,
-        },
-        likesCount: 0,
-        isLiked: false,
-        replies: [],
+    const responseData = {
+      id: comment.id,
+      content: comment.content,
+      createdAt: comment.createdAt,
+      parentId: comment.parentId,
+      commenter: {
+        id: comment.commenter.id,
+        name: commenterName,
+        image: comment.commenter.image,
       },
-      { status: 201 }
-    );
+      likesCount: 0,
+      isLiked: false,
+      replies: [],
+    };
+
+    // Broadcast to all users for live update
+    const commentsCount = await prisma.postComment.count({ where: { postId } });
+    if (parentId) {
+      broadcastNewsfeedEvent({
+        event: 'comment_replied',
+        data: { postId, parentId, reply: responseData },
+      });
+    } else {
+      broadcastNewsfeedEvent({
+        event: 'post_commented',
+        data: { postId, comment: responseData, commentsCount },
+      });
+    }
+
+    return NextResponse.json(responseData, { status: 201 });
   } catch (error) {
     console.error('Error creating comment:', error);
     return NextResponse.json({ error: 'Failed to create comment' }, { status: 500 });

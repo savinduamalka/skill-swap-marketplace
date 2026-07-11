@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadMediaToStorage } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { broadcastNewsfeedEvent } from '@/lib/newsfeed-events';
 
 // Number of posts to fetch per page
 const POSTS_PER_PAGE = 12;
@@ -322,33 +323,36 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(
-      {
-        post: {
-          id: post.id,
-          title: post.title,
-          content: post.content,
-          mediaUrl: post.mediaUrl,
-          hashtags:
-            post.hashtags
-              ?.split(',')
-              .map((tag) => tag.trim())
-              .filter(Boolean) || [],
-          viewCount: post.viewCount,
-          createdAt: post.createdAt,
-          author: {
-            id: post.author.id,
-            name: post.author.fullName || post.author.name || 'Anonymous',
-            image: post.author.image,
-            skills: post.author.skillsOffered.map((s) => s.name),
-          },
-          likesCount: post._count.likes,
-          commentsCount: post._count.comments,
-          isLiked: false,
-        },
+    const postResponse = {
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      mediaUrl: post.mediaUrl,
+      hashtags:
+        post.hashtags
+          ?.split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean) || [],
+      viewCount: post.viewCount,
+      createdAt: post.createdAt,
+      author: {
+        id: post.author.id,
+        name: post.author.fullName || post.author.name || 'Anonymous',
+        image: post.author.image,
+        skills: post.author.skillsOffered.map((s) => s.name),
       },
-      { status: 201 }
-    );
+      likesCount: post._count.likes,
+      commentsCount: post._count.comments,
+      isLiked: false,
+    };
+
+    // Broadcast new post to all connected users
+    broadcastNewsfeedEvent({
+      event: 'post_created',
+      data: { post: postResponse },
+    });
+
+    return NextResponse.json({ post: postResponse }, { status: 201 });
   } catch (error) {
     console.error('Error creating post:', error);
     return NextResponse.json(

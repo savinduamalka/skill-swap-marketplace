@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
+import { broadcastNewsfeedEvent } from '@/lib/newsfeed-events';
 
 export async function POST(
   request: NextRequest,
@@ -74,6 +75,12 @@ export async function POST(
 
     // Get updated count
     const likesCount = await prisma.commentLike.count({ where: { commentId } });
+
+    // Broadcast to all users
+    broadcastNewsfeedEvent({
+      event: 'comment_liked',
+      data: { postId, commentId, userId: session.user.id, likesCount, isLiked },
+    });
 
     return NextResponse.json({ isLiked, likesCount });
   } catch (error) {
