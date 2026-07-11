@@ -123,6 +123,11 @@ export const useChatSocket = () => {
     Set<(payload: NotificationSocketPayload) => void>
   >(new Set());
 
+  // Newsfeed real-time callbacks
+  const newsfeedCallbacks = useRef<
+    Set<(event: string, data: any) => void>
+  >(new Set());
+
   // ==================== HEARTBEAT MANAGEMENT ====================
   // Send periodic heartbeat to server (keeps connection alive)
   const startHeartbeat = useCallback(() => {
@@ -338,6 +343,23 @@ export const useChatSocket = () => {
         }
       );
 
+      // Newsfeed real-time events
+      socketRef.current.on('newsfeed:post_liked', (data: any) => {
+        newsfeedCallbacks.current.forEach((cb) => cb('post_liked', data));
+      });
+      socketRef.current.on('newsfeed:post_commented', (data: any) => {
+        newsfeedCallbacks.current.forEach((cb) => cb('post_commented', data));
+      });
+      socketRef.current.on('newsfeed:comment_liked', (data: any) => {
+        newsfeedCallbacks.current.forEach((cb) => cb('comment_liked', data));
+      });
+      socketRef.current.on('newsfeed:comment_replied', (data: any) => {
+        newsfeedCallbacks.current.forEach((cb) => cb('comment_replied', data));
+      });
+      socketRef.current.on('newsfeed:post_created', (data: any) => {
+        newsfeedCallbacks.current.forEach((cb) => cb('post_created', data));
+      });
+
       // Call signaling events
       socketRef.current.on(
         'call:incoming',
@@ -520,6 +542,17 @@ export const useChatSocket = () => {
       messageReadCallbacks.current.add(callback);
       return () => {
         messageReadCallbacks.current.delete(callback);
+      };
+    },
+    []
+  );
+
+  // Subscribe to newsfeed real-time events
+  const onNewsfeedEvent = useCallback(
+    (callback: (event: string, data: any) => void) => {
+      newsfeedCallbacks.current.add(callback);
+      return () => {
+        newsfeedCallbacks.current.delete(callback);
       };
     },
     []
@@ -756,5 +789,6 @@ export const useChatSocket = () => {
     onConversationCleared,
     onOfferStatusUpdated,
     notifyOfferStatusChanged,
+    onNewsfeedEvent,
   };
 };
