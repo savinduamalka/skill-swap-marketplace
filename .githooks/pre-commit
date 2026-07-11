@@ -1,0 +1,10 @@
+#!/bin/bash
+# Pre-commit hook: Auto-sync Prisma schema to socket-server when changed
+
+# Check if skill-swap schema was modified in this commit
+if git diff --cached --name-only | grep -q "skill-swap/prisma/schema.prisma"; then
+  echo "📦 Prisma schema changed — syncing to socket-server..."
+  cp skill-swap/prisma/schema.prisma socket-server/prisma/schema.prisma
+  git add socket-server/prisma/schema.prisma
+  echo "✅ Schema synced and staged"
+fi
