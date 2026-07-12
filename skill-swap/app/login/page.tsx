@@ -64,12 +64,21 @@ export default function LoginPage() {
   const [resetSuccess, setResetSuccess] = useState(false);
   const [socialLoginInfo, setSocialLoginInfo] = useState<{ provider: string; message: string } | null>(null);
 
-  // Check for callbackUrl indicating logout redirect
+  // Check for callbackUrl indicating logout redirect or suspended account
   useEffect(() => {
     const callbackUrl = searchParams.get('callbackUrl');
+    const error = searchParams.get('error');
+
     if (callbackUrl === '/login') {
       toast.success('You have been logged out successfully');
-      // Clean up the URL
+      window.history.replaceState({}, '', '/login');
+    }
+
+    if (error === 'ACCOUNT_SUSPENDED' || callbackUrl?.includes('ACCOUNT_SUSPENDED')) {
+      toast.error('Your account has been suspended.');
+      setErrors({
+        general: 'Your account has been suspended. Contact skillswap@gmail.com for assistance.',
+      });
       window.history.replaceState({}, '', '/login');
     }
   }, [searchParams]);
@@ -124,6 +133,14 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
+        // Check for suspended account
+        if (result.error.includes('ACCOUNT_SUSPENDED') || result.code === 'ACCOUNT_SUSPENDED') {
+          toast.error('Your account has been suspended. Please contact support at skillswap@gmail.com');
+          setErrors({
+            general: 'Your account has been suspended. Contact skillswap@gmail.com for assistance.',
+          });
+          return;
+        }
         toast.error('Invalid email or password. Please try again.');
         setErrors({
           general: 'Invalid email or password',
@@ -132,11 +149,11 @@ export default function LoginPage() {
       }
 
       toast.success('Welcome back! Login successful.', {
-        description: 'Redirecting to dashboard...',
+        description: 'Redirecting...',
         icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
       });
 
-      // Navigate to dashboard
+      // Navigate to dashboard — middleware will redirect admin users to /admin
       setTimeout(() => {
         router.push('/dashboard');
         router.refresh();
