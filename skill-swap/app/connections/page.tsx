@@ -340,9 +340,9 @@ export default async function ConnectionsPage({
                 processedConnections.map((connection) => (
                   <Card
                     key={connection.id}
-                    className="p-6 hover:shadow-md transition"
+                    className="p-4 sm:p-6 hover:shadow-md transition"
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-3 sm:gap-4">
                       <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center flex-shrink-0">
                         {connection.otherUser.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -358,43 +358,40 @@ export default async function ConnectionsPage({
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div>
-                            <p className="font-semibold text-foreground">
-                              {getDisplayName(connection.otherUser)}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {connection.otherUser.skillsOffered[0]?.name ||
-                                'No skills listed'}
-                            </p>
-                          </div>
-                          <Badge variant="default">Connected</Badge>
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-semibold text-foreground">
+                            {getDisplayName(connection.otherUser)}
+                          </p>
+                          <Badge variant="default" className="shrink-0 text-xs">Connected</Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
+                          {connection.otherUser.skillsOffered[0]?.name ||
+                            'No skills listed'}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
                           Connected {formatRelativeTime(connection.createdAt)}
                         </p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Button size="sm" asChild>
-                          <Link href="/messages">
-                            <MessageSquare className="w-4 h-4 mr-1" />
-                            Message
-                          </Link>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="bg-transparent"
-                          asChild
-                        >
-                          <Link href={`/profile/${connection.otherUser.id}`}>
-                            Profile
-                          </Link>
-                        </Button>
-                        <DisconnectButton
-                          connectionId={connection.id}
-                          userName={getDisplayName(connection.otherUser)}
-                        />
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <Button size="sm" asChild>
+                            <Link href="/messages">
+                              <MessageSquare className="w-4 h-4 mr-1" />
+                              Message
+                            </Link>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            asChild
+                          >
+                            <Link href={`/profile/${connection.otherUser.id}`}>
+                              Profile
+                            </Link>
+                          </Button>
+                          <DisconnectButton
+                            connectionId={connection.id}
+                            userName={getDisplayName(connection.otherUser)}
+                          />
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -419,9 +416,9 @@ export default async function ConnectionsPage({
                 incomingRequests.map((request) => (
                   <Card
                     key={request.id}
-                    className="p-6 hover:shadow-md transition"
+                    className="p-4 sm:p-6 hover:shadow-md transition"
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-3 sm:gap-4">
                       <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
                         {request.sender.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -437,58 +434,55 @@ export default async function ConnectionsPage({
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div>
-                            <p className="font-semibold text-foreground">
-                              {getDisplayName(request.sender)}
-                            </p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {request.sender.skillsOffered.map((skill) => (
-                                <Badge
-                                  key={skill.name}
-                                  variant="secondary"
-                                  className="text-xs"
-                                >
-                                  {skill.name}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-semibold text-foreground">
+                            {getDisplayName(request.sender)}
+                          </p>
                           <Badge
                             variant="outline"
-                            className="border-amber-500 text-amber-600"
+                            className="border-amber-500 text-amber-600 shrink-0 text-xs"
                           >
                             Incoming
                           </Badge>
                         </div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {request.sender.skillsOffered.map((skill) => (
+                            <Badge
+                              key={skill.name}
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {skill.name}
+                            </Badge>
+                          ))}
+                        </div>
                         {request.sender.bio && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
                             {request.sender.bio}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground mt-1">
                           Received {formatRelativeTime(request.createdAt)}
                         </p>
                         <p className="text-xs text-green-600 mt-1">
                           +{request.creditsHeld} credits if you accept
                         </p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <ConnectionRequestActions
-                          requestId={request.id}
-                          senderName={getDisplayName(request.sender)}
-                          creditsHeld={request.creditsHeld}
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="bg-transparent"
-                          asChild
-                        >
-                          <Link href={`/profile/${request.sender.id}`}>
-                            View Profile
-                          </Link>
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                          <ConnectionRequestActions
+                            requestId={request.id}
+                            senderName={getDisplayName(request.sender)}
+                            creditsHeld={request.creditsHeld}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            asChild
+                          >
+                            <Link href={`/profile/${request.sender.id}`}>
+                              View Profile
+                            </Link>
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -515,9 +509,9 @@ export default async function ConnectionsPage({
                 sentRequests.map((request) => (
                   <Card
                     key={request.id}
-                    className="p-6 hover:shadow-md transition"
+                    className="p-4 sm:p-6 hover:shadow-md transition"
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-3 sm:gap-4">
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg flex items-center justify-center flex-shrink-0">
                         {request.receiver.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -533,49 +527,46 @@ export default async function ConnectionsPage({
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div>
-                            <p className="font-semibold text-foreground">
-                              {getDisplayName(request.receiver)}
-                            </p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {request.receiver.skillsOffered.map((skill) => (
-                                <Badge
-                                  key={skill.name}
-                                  variant="secondary"
-                                  className="text-xs"
-                                >
-                                  {skill.name}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-semibold text-foreground">
+                            {getDisplayName(request.receiver)}
+                          </p>
                           <Badge
                             variant="outline"
-                            className="border-blue-500 text-blue-600"
+                            className="border-blue-500 text-blue-600 shrink-0 text-xs"
                           >
                             Pending
                           </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {request.receiver.skillsOffered.map((skill) => (
+                            <Badge
+                              key={skill.name}
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {skill.name}
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
                           Sent {formatRelativeTime(request.createdAt)}
                         </p>
                         <p className="text-xs text-amber-600 mt-1">
                           {request.creditsHeld} credits on hold
                         </p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="bg-transparent"
-                          asChild
-                        >
-                          <Link href={`/profile/${request.receiver.id}`}>
-                            View Profile
-                          </Link>
-                        </Button>
-                        <CancelRequestButton receiverId={request.receiver.id} />
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            asChild
+                          >
+                            <Link href={`/profile/${request.receiver.id}`}>
+                              View Profile
+                            </Link>
+                          </Button>
+                          <CancelRequestButton receiverId={request.receiver.id} />
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -599,9 +590,9 @@ export default async function ConnectionsPage({
                 blockedUsers.map((block) => (
                   <Card
                     key={block.id}
-                    className="p-6 hover:shadow-md transition"
+                    className="p-4 sm:p-6 hover:shadow-md transition"
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-3 sm:gap-4">
                       <div className="w-12 h-12 bg-gradient-to-br from-red-400 to-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
                         {block.blocked.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -617,32 +608,30 @@ export default async function ConnectionsPage({
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div>
-                            <p className="font-semibold text-foreground">
-                              {getDisplayName(block.blocked)}
-                            </p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {block.blocked.skillsOffered.map((skill) => (
-                                <Badge
-                                  key={skill.name}
-                                  variant="secondary"
-                                  className="text-xs"
-                                >
-                                  {skill.name}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-semibold text-foreground">
+                            {getDisplayName(block.blocked)}
+                          </p>
                           <Badge
                             variant="outline"
-                            className="border-red-500 text-red-600"
+                            className="border-red-500 text-red-600 shrink-0 text-xs"
                           >
                             <Ban className="w-3 h-3 mr-1" />
                             Blocked
                           </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {block.blocked.skillsOffered.map((skill) => (
+                            <Badge
+                              key={skill.name}
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {skill.name}
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
                           Blocked {formatRelativeTime(block.createdAt)}
                         </p>
                         {block.reason && (
@@ -650,12 +639,12 @@ export default async function ConnectionsPage({
                             Reason: {block.reason}
                           </p>
                         )}
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <UnblockButton
-                          userId={block.blocked.id}
-                          userName={getDisplayName(block.blocked)}
-                        />
+                        <div className="mt-3">
+                          <UnblockButton
+                            userId={block.blocked.id}
+                            userName={getDisplayName(block.blocked)}
+                          />
+                        </div>
                       </div>
                     </div>
                   </Card>
