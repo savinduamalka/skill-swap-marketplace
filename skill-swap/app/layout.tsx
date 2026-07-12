@@ -16,6 +16,7 @@ import { WalletProvider } from "@/contexts/wallet-context"
 import { UnreadMessagesProvider } from "@/contexts/unread-messages-context"
 import { CallProvider } from "@/contexts/call-context"
 import { NotificationsProvider } from "@/contexts/notifications-context"
+import { SuspensionGuard } from "@/components/suspension-guard"
 
 // Configure primary sans-serif font with Latin character support
 const geistSans = Geist({
@@ -82,6 +83,7 @@ export default function RootLayout({
             <UnreadMessagesProvider>
               <NotificationsProvider>
                 <CallProvider>
+                  <SuspensionGuard />
                   {children}
                 </CallProvider>
               </NotificationsProvider>
