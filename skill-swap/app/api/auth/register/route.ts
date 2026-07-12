@@ -7,6 +7,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, password, fullName } = body;
 
+    // Security: Only extract known fields. isAdmin, isVerified, etc. are NEVER accepted from client.
+
     // Validate required fields
     if (!email || !password || !fullName) {
       return NextResponse.json(
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
         fullName,
         name: fullName,
         passwordHash,
-        isVerified: false,
+        isVerified: true,
       },
     });
 

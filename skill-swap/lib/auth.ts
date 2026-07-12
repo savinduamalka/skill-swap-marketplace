@@ -46,6 +46,11 @@ const fullAuthConfig: NextAuthConfig = {
             return null;
           }
 
+          // Check if account is suspended
+          if (!user.isVerified) {
+            throw new Error('ACCOUNT_SUSPENDED');
+          }
+
           const isPasswordValid = await bcrypt.compare(
             credentials.password as string,
             user.passwordHash
@@ -62,6 +67,9 @@ const fullAuthConfig: NextAuthConfig = {
             image: user.image,
           };
         } catch (error) {
+          if (error instanceof Error && error.message === 'ACCOUNT_SUSPENDED') {
+            throw error;
+          }
           console.error('Authorize error:', error);
           return null;
         }
@@ -116,6 +124,19 @@ const fullAuthConfig: NextAuthConfig = {
         token.email = user.email;
         token.name = user.name;
         token.picture = user.image;
+
+        // Fetch isAdmin from DB on initial sign in
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: user.id as string },
+            select: { isAdmin: true, isVerified: true },
+          });
+          token.isAdmin = dbUser?.isAdmin ?? false;
+          token.isVerified = dbUser?.isVerified ?? true;
+        } catch {
+          token.isAdmin = false;
+          token.isVerified = true;
+        }
       }
 
       // Refresh user data (e.g., updated avatar) on subsequent checks
@@ -123,13 +144,15 @@ const fullAuthConfig: NextAuthConfig = {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { image: true, name: true, email: true },
+            select: { image: true, name: true, email: true, isAdmin: true, isVerified: true },
           });
 
           if (dbUser) {
             token.picture = dbUser.image;
             token.name = dbUser.name || (token.name as string);
             token.email = dbUser.email || (token.email as string);
+            token.isAdmin = dbUser.isAdmin;
+            token.isVerified = dbUser.isVerified;
           }
         } catch (error) {
           console.error('JWT callback refresh error:', error);
@@ -152,15 +175,34 @@ const fullAuthConfig: NextAuthConfig = {
         session.user.email = token.email as string;
         session.user.name = token.name as string;
         session.user.image = token.picture as string;
+        (session.user as unknown as Record<string, unknown>).isAdmin = token.isAdmin as boolean;
       }
       return session;
     },
     /**
      * SignIn callback - called when user signs in
+     * Checks if account is suspended (isVerified = false)
      */
     async signIn({ user, account }) {
-      // Allow all sign ins
+      // For OAuth providers, check if existing user is suspended
       if (account?.provider === 'google' || account?.provider === 'facebook') {
+        if (user?.id) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { isVerified: true },
+          });
+          if (dbUser && !dbUser.isVerified) {
+            return '/login?error=ACCOUNT_SUSPENDED';
+          }
+        } else if (user?.email) {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: user.email },
+            select: { isVerified: true },
+          });
+          if (dbUser && !dbUser.isVerified) {
+            return '/login?error=ACCOUNT_SUSPENDED';
+          }
+        }
         return true;
       }
       if (account?.provider === 'credentials') {
