@@ -22,7 +22,7 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { isVerified: true },
+      select: { isVerified: true, isAdmin: true },
     });
 
     if (!user || !user.isVerified) {
@@ -32,7 +32,7 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ status: 'active' });
+    return NextResponse.json({ status: 'active', isAdmin: user.isAdmin });
   } catch {
     return NextResponse.json({ status: 'error' }, { status: 500 });
   }

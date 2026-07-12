@@ -153,11 +153,11 @@ export default function LoginPage() {
         icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
       });
 
-      // Navigate to dashboard — middleware will redirect admin users to /admin
+      // Redirect to root — middleware handles role-based routing
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push('/');
         router.refresh();
-      }, 1000);
+      }, 500);
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -181,7 +181,7 @@ export default function LoginPage() {
       setLoading(true);
       // Store a flag to show success message after redirect
       sessionStorage.setItem('skillswap_oauth_pending', 'google');
-      await signIn('google', { callbackUrl: '/dashboard?login=success' });
+      await signIn('google', { callbackUrl: '/' });
     } catch (error) {
       console.error('Google login error:', error);
       toast.error('Failed to initiate Google login. Please try again.');
@@ -198,7 +198,7 @@ export default function LoginPage() {
       setLoading(true);
       // Store a flag to show success message after redirect
       sessionStorage.setItem('skillswap_oauth_pending', 'facebook');
-      await signIn('facebook', { callbackUrl: '/dashboard?login=success' });
+      await signIn('facebook', { callbackUrl: '/' });
     } catch (error) {
       console.error('Facebook login error:', error);
       toast.error('Failed to initiate Facebook login. Please try again.');
