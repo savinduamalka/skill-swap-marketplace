@@ -153,6 +153,11 @@ const fullAuthConfig: NextAuthConfig = {
             token.email = dbUser.email || (token.email as string);
             token.isAdmin = dbUser.isAdmin;
             token.isVerified = dbUser.isVerified;
+
+            // If user is suspended, invalidate the session
+            if (!dbUser.isVerified) {
+              token.suspended = true;
+            }
           }
         } catch (error) {
           console.error('JWT callback refresh error:', error);
