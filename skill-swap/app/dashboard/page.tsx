@@ -37,9 +37,25 @@ async function getServerDashboardData() {
       return null;
     }
 
+    // Admin users should be on /admin — redirect them (handles OAuth login callback)
+    const { prisma } = await import('@/lib/prisma');
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { isAdmin: true },
+    });
+
+    if (user?.isAdmin) {
+      const { redirect } = await import('next/navigation');
+      redirect('/admin');
+    }
+
     const data = await getDashboardData(session.user.id);
     return data;
   } catch (error) {
+    // redirect() throws a special error in Next.js — rethrow it
+    if (error && typeof error === 'object' && 'digest' in error) {
+      throw error;
+    }
     console.error('Error fetching server dashboard data:', error);
     return null;
   }

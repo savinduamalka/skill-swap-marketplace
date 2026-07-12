@@ -23,15 +23,10 @@ export const authConfig: NextAuthConfig = {
       const publicRoutes = ['/', '/login', '/signup', '/reset-password'];
       const isPublicRoute = publicRoutes.includes(pathname);
 
-      // Auth and landing routes - redirect if already logged in
+      // Auth and landing routes - redirect to dashboard if already logged in
       const isRedirectRoute = pathname === '/login' || pathname === '/signup' || pathname === '/';
 
       if (isRedirectRoute && isLoggedIn) {
-        // Check isAdmin from session (populated by JWT callback in auth.ts)
-        const isAdmin = (auth?.user as Record<string, unknown> | undefined)?.isAdmin === true;
-        if (isAdmin) {
-          return Response.redirect(new URL('/admin', nextUrl));
-        }
         return Response.redirect(new URL('/dashboard', nextUrl));
       }
 
